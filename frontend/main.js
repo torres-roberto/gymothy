@@ -31,7 +31,8 @@ const STORAGE_KEYS = {
   JOURNAL_ENTRIES: 'gymothy_journal_entries',
   LAST_SYNC: 'gymothy_last_sync',
   AUTH_TOKEN: 'gymothy_auth_token',
-  USER_INFO: 'gymothy_user_info'
+  USER_INFO: 'gymothy_user_info',
+  LAST_WEIGHT: 'gymothy_last_weight'
 };
 
 // Authentication management
@@ -81,15 +82,16 @@ const Auth = {
   },
 
   updateUI() {
-    const loginBtn = document.getElementById('loginBtn');
     const logoutBtn = document.getElementById('logoutBtn');
     const userInfo = document.getElementById('userInfo');
     const mainContent = document.getElementById('mainContent');
     const loginCard = document.getElementById('loginCard');
 
+    const token = this.getToken();
+    console.log('[DEBUG] updateUI called. Authenticated:', !!token, 'Token:', token);
+
     if (this.isAuthenticated()) {
       const user = this.getUser();
-      if (loginBtn) loginBtn.style.display = 'none';
       if (logoutBtn) logoutBtn.style.display = 'block';
       if (userInfo) {
         userInfo.style.display = 'block';
@@ -102,12 +104,13 @@ const Auth = {
       }
       if (mainContent) mainContent.style.display = 'block';
       if (loginCard) loginCard.style.display = 'none';
+      console.log('[DEBUG] Main UI shown.');
     } else {
-      if (loginBtn) loginBtn.style.display = 'block';
       if (logoutBtn) logoutBtn.style.display = 'none';
       if (userInfo) userInfo.style.display = 'none';
       if (mainContent) mainContent.style.display = 'none';
       if (loginCard) loginCard.style.display = 'block';
+      console.log('[DEBUG] Not authenticated. Showing login card.');
     }
   }
 };
@@ -345,7 +348,18 @@ document.addEventListener('DOMContentLoaded', () => {
       dateInput.value = today;
     }
 
+    // Load last weight from localStorage if present
+    const weightInput = document.getElementById('weightInput');
+    if (weightInput && !weightInput.value) {
+      const lastWeight = localStorage.getItem(STORAGE_KEYS.LAST_WEIGHT);
+      if (lastWeight) {
+        weightInput.value = lastWeight;
+        console.log('[DEBUG] Loaded last weight from localStorage:', lastWeight);
+      }
+    }
+
     if (addExerciseToListBtn && exerciseEntryDiv) {
+      console.log('[DEBUG] Attaching Add Exercise event listener');
       addExerciseToListBtn.addEventListener('click', () => {
         console.log('[DEBUG] Add Exercise button clicked');
         const name = exerciseEntryDiv.querySelector('input[name="exercise"]').value.trim();
@@ -353,8 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const reps = exerciseEntryDiv.querySelector('input[name="set-reps"]').value;
         const time = exerciseEntryDiv.querySelector('input[name="set-time"]').value;
         
-        console.log('[DEBUG] Form values:', { name, weight, reps, time });
-        
+        console.log('[DEBUG] Read form values:', { name, weight, reps, time });
         if (!name) {
           console.log('[DEBUG] No exercise name, showing alert');
           alert('Exercise name is required.');
@@ -367,8 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
           time: time || undefined
         };
         
-        console.log('[DEBUG] New set created:', newSet);
-        
+        console.log('[DEBUG] New set object:', newSet);
         // Check if exercise with same name and parameters already exists
         const existingExerciseIndex = exercises.findIndex(ex => 
           ex.name === name && 
@@ -761,6 +773,11 @@ document.addEventListener('DOMContentLoaded', () => {
           displayEntries(localEntries);
           clearForm();
           showSuccessMessage();
+          // Persist last weight to localStorage
+          if (bodyWeight) {
+            localStorage.setItem(STORAGE_KEYS.LAST_WEIGHT, bodyWeight);
+            console.log('[DEBUG] Saved last weight to localStorage:', bodyWeight);
+          }
         })
         .catch(error => {
           console.error('[ERROR] Failed to save entry:', error);
