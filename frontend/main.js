@@ -251,6 +251,9 @@ window.clearAllEntries = function() {
     });
 };
 
+// Expose loadJournal globally so it is always available
+window.loadJournal = function() {};
+
 document.addEventListener('DOMContentLoaded', () => {
   console.log('[DEBUG] DOM loaded, initializing app...');
   
@@ -529,6 +532,9 @@ document.addEventListener('DOMContentLoaded', () => {
           displayEntries(localEntries);
         });
     }
+
+    // After defining loadJournal, assign it to the global
+    window.loadJournal = loadJournal;
 
     function mergeEntries(localEntries, backendEntries) {
       // Create a map of backend entries by date for quick lookup
@@ -875,8 +881,6 @@ document.addEventListener('DOMContentLoaded', () => {
       renderExerciseList();
       // Do not reset date to today (let user keep editing same date if desired)
     }
-
-    window.loadJournal = loadJournal;
 
   } catch (error) {
     console.error('[ERROR] Failed to initialize app:', error);
