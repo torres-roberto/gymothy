@@ -319,6 +319,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (journalSection) journalSection.style.display = 'none';
     if (chartsSection) chartsSection.style.display = 'none';
 
+    // Set date input to today by default if empty
+    const dateInput = document.getElementById('dateInput');
+    if (dateInput && !dateInput.value) {
+      const today = new Date().toISOString().split('T')[0];
+      dateInput.value = today;
+    }
+
     if (addExerciseToListBtn && exerciseEntryDiv) {
       addExerciseToListBtn.addEventListener('click', () => {
         console.log('[DEBUG] Add Exercise button clicked');
