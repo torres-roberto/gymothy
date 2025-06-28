@@ -1,16 +1,101 @@
 let exercises = [];
+let authToken = null;
+let currentUser = null;
 
-const API_URL = 'https://gymothy-6fd370396b25.herokuapp.com/api/entries';
+const API_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://gymothy-backend.onrender.com/api/entries'
+  : 'http://localhost:3000/api/entries';
+
+const AUTH_URL = process.env.NODE_ENV === 'production'
+  ? 'https://gymothy-backend.onrender.com'
+  : 'http://localhost:3000';
 
 // Logging helper
 function log(...args) {
-  console.log('[GymTracker]', ...args);
+  console.log('[Gymothy]', ...args);
 }
 
 // Local storage keys
 const STORAGE_KEYS = {
-  JOURNAL_ENTRIES: 'gymtracker_journal_entries',
-  LAST_SYNC: 'gymtracker_last_sync'
+  JOURNAL_ENTRIES: 'gymothy_journal_entries',
+  LAST_SYNC: 'gymothy_last_sync',
+  AUTH_TOKEN: 'gymothy_auth_token',
+  USER_INFO: 'gymothy_user_info'
+};
+
+// Authentication management
+const Auth = {
+  getToken() {
+    return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+  },
+
+  setToken(token) {
+    localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+    authToken = token;
+  },
+
+  clearToken() {
+    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    authToken = null;
+  },
+
+  getUser() {
+    const userStr = localStorage.getItem(STORAGE_KEYS.USER_INFO);
+    return userStr ? JSON.parse(userStr) : null;
+  },
+
+  setUser(user) {
+    localStorage.setItem(STORAGE_KEYS.USER_INFO, JSON.stringify(user));
+    currentUser = user;
+  },
+
+  clearUser() {
+    localStorage.removeItem(STORAGE_KEYS.USER_INFO);
+    currentUser = null;
+  },
+
+  isAuthenticated() {
+    return !!this.getToken();
+  },
+
+  login() {
+    window.location.href = `${AUTH_URL}/auth/google`;
+  },
+
+  logout() {
+    this.clearToken();
+    this.clearUser();
+    this.updateUI();
+    window.location.href = window.location.origin;
+  },
+
+  updateUI() {
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const userInfo = document.getElementById('userInfo');
+    const mainContent = document.getElementById('mainContent');
+
+    if (this.isAuthenticated()) {
+      const user = this.getUser();
+      if (loginBtn) loginBtn.style.display = 'none';
+      if (logoutBtn) logoutBtn.style.display = 'block';
+      if (userInfo) {
+        userInfo.style.display = 'block';
+        userInfo.innerHTML = `
+          <div class="user-profile">
+            <img src="${user.picture || '/default-avatar.png'}" alt="Profile" class="user-avatar">
+            <span class="user-name">${user.name}</span>
+          </div>
+        `;
+      }
+      if (mainContent) mainContent.style.display = 'block';
+    } else {
+      if (loginBtn) loginBtn.style.display = 'block';
+      if (logoutBtn) logoutBtn.style.display = 'none';
+      if (userInfo) userInfo.style.display = 'none';
+      if (mainContent) mainContent.style.display = 'none';
+    }
+  }
 };
 
 // Local storage management
@@ -49,6 +134,56 @@ const LocalStorage = {
     } catch (error) {
       console.error('[ERROR] Failed to set last sync in localStorage:', error);
     }
+  }
+};
+
+// API helper with authentication
+const API = {
+  async request(endpoint, options = {}) {
+    const token = Auth.getToken();
+    if (!token) {
+      throw new Error('No authentication token');
+    }
+
+    const defaultOptions = {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    };
+
+    const response = await fetch(`${AUTH_URL}${endpoint}`, {
+      ...defaultOptions,
+      ...options,
+      headers: {
+        ...defaultOptions.headers,
+        ...options.headers
+      }
+    });
+
+    if (response.status === 401) {
+      Auth.logout();
+      throw new Error('Authentication expired');
+    }
+
+    return response;
+  },
+
+  async get(endpoint) {
+    return this.request(endpoint);
+  },
+
+  async post(endpoint, data) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async delete(endpoint) {
+    return this.request(endpoint, {
+      method: 'DELETE'
+    });
   }
 };
 
@@ -92,20 +227,66 @@ window.clearAllEntries = function() {
   console.log('[TEST] Clearing all entries...');
   LocalStorage.saveEntries([]);
   displayEntries([]);
-  fetch(API_URL, {
-    method: 'DELETE'
-  })
-  .then(response => response.json())
-  .then(data => {
-    console.log('[TEST] All entries cleared:', data);
-  })
-  .catch(error => {
-    console.error('[ERROR] Error clearing entries:', error);
-  });
+  API.delete('/api/entries')
+    .then(response => response.json())
+    .then(data => {
+      console.log('[TEST] All entries cleared:', data);
+    })
+    .catch(error => {
+      console.error('[ERROR] Error clearing entries:', error);
+    });
 };
 
 document.addEventListener('DOMContentLoaded', () => {
   console.log('[DEBUG] DOM loaded, initializing app...');
+  
+  // Check for authentication token in URL (from OAuth callback)
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get('token');
+  if (token) {
+    Auth.setToken(token);
+    // Clear token from URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+    // Fetch user info
+    API.get('/auth/me')
+      .then(response => response.json())
+      .then(data => {
+        Auth.setUser(data.user);
+        Auth.updateUI();
+        loadJournal();
+      })
+      .catch(error => {
+        console.error('[ERROR] Failed to get user info:', error);
+        Auth.logout();
+      });
+  } else {
+    // Check for existing token
+    const existingToken = Auth.getToken();
+    if (existingToken) {
+      authToken = existingToken;
+      currentUser = Auth.getUser();
+      Auth.updateUI();
+      loadJournal();
+    } else {
+      Auth.updateUI();
+    }
+  }
+
+  // Setup authentication buttons
+  const loginBtn = document.getElementById('loginBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
+
+  if (loginBtn) {
+    loginBtn.addEventListener('click', () => {
+      Auth.login();
+    });
+  }
+
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      Auth.logout();
+    });
+  }
   
   try {
     const form = document.getElementById('entryForm');
@@ -198,433 +379,471 @@ document.addEventListener('DOMContentLoaded', () => {
       // Clear fields with staggered timing for a nice effect
       fields.forEach((field, index) => {
         setTimeout(() => {
-          typewriterClear(field);
-        }, index * 100); // 100ms delay between each field
-      });
-      
-      log('Form cleared for new exercise');
-    });
-
-    exerciseListUl.addEventListener('click', (e) => {
-      if (e.target.classList.contains('removeExerciseFromList')) {
-        const idx = parseInt(e.target.dataset.idx);
-        exercises.splice(idx, 1);
-        renderExerciseList();
-      } else if (e.target.closest('li')) {
-        // Click on exercise list item to populate form
-        const li = e.target.closest('li');
-        const idx = parseInt(li.dataset.idx);
-        const exercise = exercises[idx];
-        if (exercise) {
-          const set = exercise.sets[0];
-          exerciseEntryDiv.querySelector('input[name="exercise"]').value = exercise.name;
-          exerciseEntryDiv.querySelector('input[name="set-weight"]').value = set.weight || '';
-          exerciseEntryDiv.querySelector('input[name="set-reps"]').value = set.reps || '';
-          exerciseEntryDiv.querySelector('input[name="set-time"]').value = set.time || '';
-          log('Exercise loaded into form', exercise);
-        }
-      }
-    });
-
-    function renderExerciseList() {
-      exerciseListUl.innerHTML = '';
-      exercises.forEach((ex, idx) => {
-        const li = document.createElement('li');
-        li.dataset.idx = idx;
-        li.style.cursor = 'pointer';
-        li.className = 'entry-card';
-        const set = ex.sets[0];
-        let displayText = `<strong>${ex.name}</strong>`;
-        displayText += ((set.weight !== undefined && set.weight !== '') ? ` | Weight: ${set.weight}lb` : '');
-        displayText += ((set.reps !== undefined && set.reps !== '') ? ` | Reps: ${set.reps}` : '');
-        displayText += ((set.time !== undefined && set.time !== '') ? ` | Time: ${set.time}` : '');
-        if (ex.sets.length > 1) {
-          displayText += ` | Sets: ${ex.sets.length}`;
-        }
-        li.innerHTML = displayText + ` <button type="button" class="removeExerciseFromList" data-idx="${idx}">Remove</button>`;
-        exerciseListUl.appendChild(li);
-      });
-      
-      // Show/hide New Exercise button based on exercise list with smooth transition
-      if (exercises.length > 0) {
-        clearExercisesBtn.style.display = 'block';
-        // Use setTimeout to ensure display: block is applied before adding the show class
-        setTimeout(() => {
-          clearExercisesBtn.classList.add('show');
-        }, 10);
-      } else {
-        clearExercisesBtn.classList.remove('show');
-        // Hide the button after transition completes
-        setTimeout(() => {
-          if (exercises.length === 0) {
-            clearExercisesBtn.style.display = 'none';
+          if (field) {
+            typewriterClear(field, 30);
           }
-        }, 300);
+        }, index * 100);
+      });
+      
+      // Clear exercises array
+      exercises = [];
+      renderExerciseList();
+      
+      // Show/hide clear button
+      if (clearExercisesBtn) {
+        clearExercisesBtn.style.display = 'none';
       }
-    }
+    });
 
-    form.addEventListener('submit', async (e) => {
-      console.log('[DEBUG] Form submit event triggered');
+    // Form submission
+    form.addEventListener('submit', (e) => {
       e.preventDefault();
-      console.log('[DEBUG] Calling saveEntry function');
       saveEntry();
     });
 
-    function loadJournal() {
-      console.log('[DEBUG] Loading journal entries...');
+    // Initial setup
+    renderExerciseList();
+    loadJournal();
+
+    function renderExerciseList() {
+      if (!exerciseListUl) return;
       
-      // First try to load from backend
-      fetch(API_URL)
-        .then(response => {
-          console.log('[DEBUG] Backend response status:', response.status);
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          return response.json();
-        })
+      exerciseListUl.innerHTML = '';
+      
+      if (exercises.length === 0) {
+        exerciseListUl.innerHTML = '<li class="no-exercises">No exercises added yet</li>';
+        if (clearExercisesBtn) clearExercisesBtn.style.display = 'none';
+        return;
+      }
+      
+      exercises.forEach((exercise, exerciseIndex) => {
+        const li = document.createElement('li');
+        li.className = 'exercise-item';
+        
+        const exerciseName = document.createElement('strong');
+        exerciseName.textContent = exercise.name;
+        li.appendChild(exerciseName);
+        
+        if (exercise.sets && exercise.sets.length > 0) {
+          const setsList = document.createElement('ul');
+          setsList.className = 'sets-list';
+          
+          exercise.sets.forEach((set, setIndex) => {
+            const setLi = document.createElement('li');
+            const setDetails = [];
+            
+            if (set.weight) setDetails.push(`${set.weight} lb`);
+            if (set.reps) setDetails.push(`${set.reps} reps`);
+            if (set.time) setDetails.push(`${set.time}`);
+            
+            setLi.textContent = setDetails.join(' × ');
+            setsList.appendChild(setLi);
+          });
+          
+          li.appendChild(setsList);
+        }
+        
+        exerciseListUl.appendChild(li);
+      });
+      
+      if (clearExercisesBtn) {
+        clearExercisesBtn.style.display = 'block';
+      }
+    }
+
+    function loadJournal() {
+      if (!Auth.isAuthenticated()) {
+        console.log('[DEBUG] Not authenticated, skipping journal load');
+        return;
+      }
+
+      console.log('[DEBUG] Loading journal...');
+      
+      // Load from localStorage first
+      const localEntries = LocalStorage.getEntries();
+      displayEntries(localEntries);
+      
+      // Then sync with backend
+      API.get('/api/entries')
+        .then(response => response.json())
         .then(backendEntries => {
-          console.log('[DEBUG] Backend entries loaded:', backendEntries);
+          console.log('[DEBUG] Backend entries loaded:', backendEntries.length);
           
-          // Get local entries
-          const localEntries = LocalStorage.getEntries();
-          console.log('[DEBUG] Local entries loaded:', localEntries);
-          
-          // Merge and display
+          // Merge local and backend entries
           const mergedEntries = mergeEntries(localEntries, backendEntries);
-          console.log('[DEBUG] Merged entries:', mergedEntries);
           
+          // Save merged entries locally
+          LocalStorage.saveEntries(mergedEntries);
+          
+          // Display merged entries
           displayEntries(mergedEntries);
           
-          // Sync to backend if we have local entries
-          if (localEntries.length > 0) {
-            console.log('[DEBUG] Syncing local entries to backend...');
-            syncToBackend(mergedEntries);
-          }
+          // Update last sync time
+          LocalStorage.setLastSync();
         })
         .catch(error => {
           console.error('[ERROR] Failed to load from backend:', error);
-          console.log('[DEBUG] Falling back to local storage...');
-          
-          // Fallback to local storage
-          const localEntries = LocalStorage.getEntries();
+          // Still show local entries if backend fails
           displayEntries(localEntries);
         });
     }
 
-    // Merge local and backend entries, preferring local for conflicts
     function mergeEntries(localEntries, backendEntries) {
-      const merged = [...localEntries];
-      
-      backendEntries.forEach(backendEntry => {
-        const existingIndex = merged.findIndex(entry => entry.date === backendEntry.date);
-        if (existingIndex === -1) {
-          // Add backend entry if no local entry exists for this date
-          merged.push(backendEntry);
-        }
-        // If local entry exists, keep it (local takes precedence)
+      // Create a map of backend entries by date for quick lookup
+      const backendMap = new Map();
+      backendEntries.forEach(entry => {
+        backendMap.set(entry.date, entry);
       });
       
+      // Merge local entries with backend entries
+      const merged = [...localEntries];
+      backendEntries.forEach(backendEntry => {
+        const localIndex = merged.findIndex(entry => entry.date === backendEntry.date);
+        if (localIndex === -1) {
+          // Backend entry doesn't exist locally, add it
+          merged.push(backendEntry);
+        } else {
+          // Entry exists in both, keep the one with more recent ID (assuming ID is timestamp)
+          if (backendEntry.id > merged[localIndex].id) {
+            merged[localIndex] = backendEntry;
+          }
+        }
+      });
+      
+      // Sort by date (newest first)
       return merged.sort((a, b) => new Date(b.date) - new Date(a.date));
     }
 
     function displayEntries(entries) {
-      console.log('[DEBUG] displayEntries called with:', entries);
-      entriesList.innerHTML = '';
+      if (!entriesList) return;
       
-      if (entries.length > 0) {
-        if (journalSection) journalSection.style.display = '';
-        if (chartsSection) chartsSection.style.display = '';
-      } else {
-        if (journalSection) journalSection.style.display = 'none';
+      if (entries.length === 0) {
+        entriesList.innerHTML = '<li class="no-entries">No journal entries yet. Start by logging your first workout!</li>';
+        if (journalSection) journalSection.style.display = 'block';
         if (chartsSection) chartsSection.style.display = 'none';
+        return;
       }
       
-      // Display entries (already merged and sorted)
-      entries.forEach((entry, idx) => {
+      entriesList.innerHTML = '';
+      
+      entries.forEach(entry => {
         const li = document.createElement('li');
         li.className = 'journal-entry';
         
-        // Build header text (date, weight, goal)
-        let headerText = `<span class='entry-arrow' style='display:inline-block;transition:transform 0.2s;'>&#9660;</span> <strong>Date:</strong> ${entry.date}`;
-        if (entry.bodyWeight && entry.bodyWeight !== 'undefined' && entry.bodyWeight !== 'null' && entry.bodyWeight !== '' && entry.bodyWeight !== undefined && entry.bodyWeight !== null && entry.bodyWeight.toString().trim() !== '') {
-          headerText += ` &nbsp; <strong>Body Weight:</strong> ${entry.bodyWeight}lb`;
-        }
-        if (entry.goals && entry.goals !== 'undefined' && entry.goals !== 'null' && entry.goals !== '' && entry.goals !== undefined && entry.goals !== null && entry.goals.toString().trim() !== '') {
-          headerText += ` &nbsp; <strong>Goal:</strong> ${entry.goals}`;
+        const header = document.createElement('div');
+        header.className = 'entry-header';
+        
+        const date = document.createElement('strong');
+        date.textContent = new Date(entry.date).toLocaleDateString();
+        header.appendChild(date);
+        
+        if (entry.bodyWeight) {
+          const weight = document.createElement('span');
+          weight.className = 'body-weight';
+          weight.textContent = `${entry.bodyWeight} lb`;
+          header.appendChild(weight);
         }
         
-        // Collapsible content (exercises)
-        let detailsHtml = '';
+        if (entry.goals) {
+          const goals = document.createElement('span');
+          goals.className = 'goals';
+          goals.textContent = entry.goals;
+          header.appendChild(goals);
+        }
+        
+        li.appendChild(header);
+        
         if (entry.exercises && entry.exercises.length > 0) {
-          detailsHtml += '<ul class="entry-details" style="margin:0.5em 0 0.5em 1.5em; padding:0;">';
-          entry.exercises.forEach(ex => {
-            detailsHtml += `<li style="background:none; border:none; padding:0; color:inherit; font-size:inherit;">
-              <strong>${ex.name}</strong>:
-                <ul style='margin:0.2em 0 0.2em 1.5em; padding:0;'>`;
-            ex.sets.forEach(set => {
-              let setText = '';
-              if (set.weight !== undefined && set.weight !== '' && set.weight !== 'undefined' && set.weight !== null) {
-                setText += `Weight: ${set.weight}lb, `;
-              }
-              if (set.reps !== undefined && set.reps !== '' && set.reps !== 'undefined' && set.reps !== null) {
-                setText += `Reps: ${set.reps}, `;
-              }
-              if (set.time !== undefined && set.time !== '' && set.time !== 'undefined' && set.time !== null) {
-                setText += `Time: ${set.time}`;
-              }
-              setText = setText.replace(/, $/, '');
-              if (setText) {
-                detailsHtml += `<li style='background:none; border:none; padding:0; color:inherit; font-size:inherit;'>${setText}</li>`;
-              }
-            });
-            detailsHtml += `</ul></li>`;
+          const exercisesList = document.createElement('ul');
+          exercisesList.className = 'exercises-list';
+          
+          entry.exercises.forEach(exercise => {
+            const exerciseLi = document.createElement('li');
+            exerciseLi.className = 'exercise-entry';
+            
+            const exerciseName = document.createElement('strong');
+            exerciseName.textContent = exercise.name;
+            exerciseLi.appendChild(exerciseName);
+            
+            if (exercise.sets && exercise.sets.length > 0) {
+              const setsList = document.createElement('ul');
+              setsList.className = 'sets-list';
+              
+              exercise.sets.forEach(set => {
+                const setLi = document.createElement('li');
+                const setDetails = [];
+                
+                if (set.weight) setDetails.push(`${set.weight} lb`);
+                if (set.reps) setDetails.push(`${set.reps} reps`);
+                if (set.time) setDetails.push(set.time);
+                
+                setLi.textContent = setDetails.join(' × ');
+                setsList.appendChild(setLi);
+              });
+              
+              exerciseLi.appendChild(setsList);
+            }
+            
+            exercisesList.appendChild(exerciseLi);
           });
-          detailsHtml += '</ul>';
+          
+          li.appendChild(exercisesList);
         }
-        
-        // Compose entry HTML
-        li.innerHTML = `<div class='entry-header' style='cursor:pointer;user-select:none;'>${headerText}</div><div class='entry-content' style='display:block;'>${detailsHtml}</div>`;
-        
-        // Collapsible logic
-        const headerDiv = li.querySelector('.entry-header');
-        const contentDiv = li.querySelector('.entry-content');
-        const arrow = li.querySelector('.entry-arrow');
-        let expanded = true;
-        headerDiv.addEventListener('click', () => {
-          expanded = !expanded;
-          contentDiv.style.display = expanded ? 'block' : 'none';
-          arrow.style.transform = expanded ? 'rotate(0deg)' : 'rotate(-90deg)';
-        });
-        // Start expanded
-        contentDiv.style.display = 'block';
-        arrow.style.transform = 'rotate(0deg)';
         
         entriesList.appendChild(li);
       });
       
-      console.log('[DEBUG] Display updated');
+      if (journalSection) journalSection.style.display = 'block';
+      if (chartsSection) chartsSection.style.display = 'block';
+      
+      // Update chart if Chart.js is available
+      if (typeof Chart !== 'undefined') {
+        updateChart(entries);
+      }
     }
 
     function updateChart(entries) {
-      const ctx = document.getElementById('progressChart').getContext('2d');
-      if (window.progressChart) window.progressChart.destroy();
-      // Example: chart weight over time
-      const labels = entries.map(e => e.date);
-      const weights = entries.map(e => e.bodyWeight).filter(w => w && w !== null && w !== undefined);
-      window.progressChart = new Chart(ctx, {
+      const ctx = document.getElementById('progressChart');
+      if (!ctx) return;
+      
+      // Filter entries with body weight data
+      const weightEntries = entries.filter(entry => entry.bodyWeight).slice(-30); // Last 30 entries
+      
+      if (weightEntries.length === 0) return;
+      
+      const labels = weightEntries.map(entry => new Date(entry.date).toLocaleDateString());
+      const data = weightEntries.map(entry => parseFloat(entry.bodyWeight));
+      
+      // Destroy existing chart if it exists
+      if (window.weightChart) {
+        window.weightChart.destroy();
+      }
+      
+      window.weightChart = new Chart(ctx, {
         type: 'line',
         data: {
-          labels,
+          labels: labels,
           datasets: [{
             label: 'Body Weight (lb)',
-            data: weights,
-            borderColor: '#007bff',
-            fill: false
+            data: data,
+            borderColor: '#00ff00',
+            backgroundColor: 'rgba(0, 255, 0, 0.1)',
+            tension: 0.1
           }]
         },
         options: {
           responsive: true,
-          plugins: { legend: { display: true } }
+          scales: {
+            y: {
+              beginAtZero: false,
+              grid: {
+                color: '#333'
+              },
+              ticks: {
+                color: '#fff'
+              }
+            },
+            x: {
+              grid: {
+                color: '#333'
+              },
+              ticks: {
+                color: '#fff'
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              labels: {
+                color: '#fff'
+              }
+            }
+          }
         }
       });
     }
 
     function saveEntry() {
-      console.log('[DEBUG] saveEntry called');
-      console.log('[DEBUG] exercises array:', exercises);
-      
-      if (exercises.length === 0) {
-          console.log('[DEBUG] No exercises found, showing alert');
-          alert('Please add at least one exercise before saving.');
-          return;
+      if (!Auth.isAuthenticated()) {
+        alert('Please log in to save your workout.');
+        return;
       }
 
-      // Get form values and filter out empty/undefined values
-      const dateValue = document.getElementById('dateInput').value;
-      const weightValue = document.getElementById('weightInput').value;
-      const goalValue = document.getElementById('goalInput').value;
+      console.log('[DEBUG] Saving entry...');
       
-      console.log('[DEBUG] Form values:', { dateValue, weightValue, goalValue });
-
-      const newEntry = {
-          date: dateValue,
-          exercises: exercises,
-          bodyWeight: weightValue && weightValue.trim() !== '' ? weightValue : null,
-          // If goal is blank, set to null (not undefined or empty string)
-          goals: goalValue && goalValue.trim() !== '' ? goalValue : null,
-          id: Date.now() // Generate unique ID
-      };
+      const dateInput = document.getElementById('dateInput');
+      const weightInput = document.getElementById('weightInput');
+      const goalInput = document.getElementById('goalInput');
       
-      console.log('[DEBUG] New entry object:', newEntry);
-
-      // Get existing entries from local storage
-      const existingEntries = LocalStorage.getEntries();
-      console.log('[DEBUG] Existing entries from localStorage:', existingEntries);
-
-      // Find existing entry for the same date
-      const existingEntryIndex = existingEntries.findIndex(entry => entry.date === dateValue);
-      
-      if (existingEntryIndex !== -1) {
-        // Update existing entry for the same date
-        console.log('[DEBUG] Found existing entry for date, merging...');
-        const existingEntry = existingEntries[existingEntryIndex];
-        
-        // Merge body weight (prefer new value if present)
-        existingEntry.bodyWeight = newEntry.bodyWeight || existingEntry.bodyWeight;
-        // Overwrite goal: if newEntry.goals is null, remove the property
-        if (newEntry.goals === null) {
-          delete existingEntry.goals;
-        } else {
-          existingEntry.goals = newEntry.goals;
-        }
-        
-        // Merge exercises
-        newEntry.exercises.forEach(newExercise => {
-          const existingExerciseIndex = existingEntry.exercises.findIndex(ex => ex.name === newExercise.name);
-          if (existingExerciseIndex !== -1) {
-            // Add sets to existing exercise
-            existingEntry.exercises[existingExerciseIndex].sets = existingEntry.exercises[existingExerciseIndex].sets.concat(newExercise.sets);
-          } else {
-            // Add new exercise
-            existingEntry.exercises.push(newExercise);
-          }
-        });
-        
-        // Update the entry
-        existingEntries[existingEntryIndex] = existingEntry;
-        console.log('[DEBUG] Updated existing entry:', existingEntry);
-      } else {
-        // Create new entry for the date
-        console.log('[DEBUG] Creating new entry for date');
-        existingEntries.push(newEntry);
-      }
-
-      // Save to local storage immediately for fast response
-      LocalStorage.saveEntries(existingEntries);
-      
-      // Update display immediately
-      displayEntries(existingEntries);
-      
-      console.log('[DEBUG] Starting animation...');
-      
-      // Animate and remove entry cards
-      animateAndRemoveEntries(() => {
-        console.log('[DEBUG] Animation completed, clearing form...');
-        // After animation, clear form and exercises
-        exercises = [];
-        renderExerciseList(); // This will clear the UI
-        clearForm();
-        
-        showSuccessMessage();
-        console.log('[DEBUG] Form cleared and journal updated');
-        
-        // Sync to backend in background
-        syncToBackend(existingEntries);
-      });
-      // Also clear the exercise list UI immediately after save (in case of fast user interaction)
-      exercises = [];
-      renderExerciseList();
-    }
-
-    // Background sync to backend
-    function syncToBackend(entries) {
-      console.log('[DEBUG] Syncing entries to backend:', entries);
-      
-      // First clear backend
-      fetch(API_URL, {
-        method: 'DELETE'
-      })
-      .then(() => {
-        // Then bulk upload
-        return fetch(`${API_URL}/bulk`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ entries })
-        });
-      })
-      .then(response => response.json())
-      .then(data => {
-        console.log('[DEBUG] Backend sync successful:', data);
-        LocalStorage.setLastSync();
-      })
-      .catch(error => {
-        console.error('[ERROR] Backend sync failed:', error);
-      });
-    }
-
-    function syncEntriesIndividually(entries) {
-      console.log('[DEBUG] Syncing entries individually to backend:', entries);
-      
-      // Clear backend first
-      fetch(API_URL, {
-        method: 'DELETE'
-      })
-      .then(() => {
-        // Then add each entry individually
-        const promises = entries.map(entry => 
-          fetch(API_URL, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(entry)
-          })
-        );
-        
-        return Promise.all(promises);
-      })
-      .then(responses => {
-        console.log('[DEBUG] Individual sync successful:', responses.length, 'entries');
-        LocalStorage.setLastSync();
-      })
-      .catch(error => {
-        console.error('[ERROR] Individual sync failed:', error);
-      });
-    }
-
-    function animateAndRemoveEntries(callback) {
-      console.log('[DEBUG] animateAndRemoveEntries called');
-      const cards = document.querySelectorAll('#exerciseList .entry-card');
-      console.log('[DEBUG] Found cards to animate:', cards.length);
-      
-      if (cards.length === 0) {
-        console.log('[DEBUG] No cards found, calling callback immediately');
-        callback();
+      if (!dateInput || !weightInput || !goalInput) {
+        console.error('[ERROR] Required form elements not found');
         return;
       }
       
-      let finished = 0;
-      cards.forEach((card, i) => {
-        console.log(`[DEBUG] Animating card ${i + 1}/${cards.length}`);
-        setTimeout(() => {
-          card.classList.add('roll-up');
-          card.addEventListener('animationend', () => {
-            console.log(`[DEBUG] Card ${i + 1} animation ended, removing from DOM`);
-            card.remove();
-            finished++;
-            console.log(`[DEBUG] Finished cards: ${finished}/${cards.length}`);
-            if (finished === cards.length) {
-              console.log('[DEBUG] All cards finished, calling callback');
-              setTimeout(callback, 200); // small delay after last card
-            }
-          }, { once: true });
-        }, i * 150);
-      });
+      const date = dateInput.value;
+      const bodyWeight = weightInput.value;
+      const goals = goalInput.value.trim();
+      
+      console.log('[DEBUG] Form values:', { date, bodyWeight, goals, exercises });
+      
+      if (!date) {
+        alert('Please select a date.');
+        return;
+      }
+      
+      if (!bodyWeight) {
+        alert('Please enter your body weight.');
+        return;
+      }
+      
+      if (exercises.length === 0) {
+        alert('Please add at least one exercise.');
+        return;
+      }
+      
+      const entry = {
+        date,
+        bodyWeight,
+        goals: goals || undefined,
+        exercises: [...exercises]
+      };
+      
+      console.log('[DEBUG] Entry to save:', entry);
+      
+      // Save to backend first
+      API.post('/api/entries', entry)
+        .then(response => response.json())
+        .then(savedEntry => {
+          console.log('[DEBUG] Entry saved to backend:', savedEntry);
+          
+          // Add to local storage
+          const localEntries = LocalStorage.getEntries();
+          const existingIndex = localEntries.findIndex(e => e.date === date);
+          
+          if (existingIndex !== -1) {
+            localEntries[existingIndex] = savedEntry;
+          } else {
+            localEntries.push(savedEntry);
+          }
+          
+          // Sort by date (newest first)
+          localEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
+          
+          LocalStorage.saveEntries(localEntries);
+          LocalStorage.setLastSync();
+          
+          // Display updated entries
+          displayEntries(localEntries);
+          
+          // Clear form
+          clearForm();
+          
+          // Show success message
+          showSuccessMessage();
+        })
+        .catch(error => {
+          console.error('[ERROR] Failed to save entry:', error);
+          alert('Failed to save entry. Please try again.');
+        });
+    }
+
+    function syncToBackend(entries) {
+      if (!Auth.isAuthenticated()) {
+        console.log('[DEBUG] Not authenticated, skipping sync');
+        return;
+      }
+
+      console.log('[DEBUG] Syncing entries to backend...');
+      
+      API.post('/api/entries/bulk', { entries })
+        .then(response => response.json())
+        .then(data => {
+          console.log('[DEBUG] Sync successful:', data);
+          LocalStorage.setLastSync();
+        })
+        .catch(error => {
+          console.error('[ERROR] Sync failed:', error);
+        });
+    }
+
+    function syncEntriesIndividually(entries) {
+      if (!Auth.isAuthenticated()) {
+        console.log('[DEBUG] Not authenticated, skipping sync');
+        return;
+      }
+
+      console.log('[DEBUG] Syncing entries individually...');
+      
+      const promises = entries.map(entry => 
+        API.post('/api/entries', entry)
+          .then(response => response.json())
+          .catch(error => {
+            console.error('[ERROR] Failed to sync entry:', entry, error);
+            return null;
+          })
+      );
+      
+      Promise.all(promises)
+        .then(results => {
+          const successful = results.filter(r => r !== null);
+          console.log('[DEBUG] Individual sync completed:', successful.length, 'successful');
+          LocalStorage.setLastSync();
+        })
+        .catch(error => {
+          console.error('[ERROR] Individual sync failed:', error);
+        });
+    }
+
+    function animateAndRemoveEntries(callback) {
+      const entries = entriesList.querySelectorAll('li');
+      let index = 0;
+      
+      function animateNext() {
+        if (index < entries.length) {
+          const entry = entries[index];
+          entry.style.transform = 'translateX(-100%)';
+          entry.style.opacity = '0';
+          entry.style.transition = 'all 0.3s ease';
+          
+          setTimeout(() => {
+            entry.remove();
+            index++;
+            animateNext();
+          }, 100);
+        } else {
+          if (callback) callback();
+        }
+      }
+      
+      animateNext();
     }
 
     function showSuccessMessage() {
-      console.log('[DEBUG] showSuccessMessage called');
-      const msg = document.createElement('div');
-      msg.className = 'success-message';
-      msg.textContent = 'Workout Saved! 💪';
-      document.body.appendChild(msg);
-      console.log('[DEBUG] Success message added to DOM');
+      const message = document.createElement('div');
+      message.className = 'success-message';
+      message.textContent = 'Workout saved successfully! 💪';
+      message.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #00ff00;
+        color: #000;
+        padding: 15px 20px;
+        border-radius: 5px;
+        font-weight: bold;
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+      `;
+      
+      document.body.appendChild(message);
+      
       setTimeout(() => {
-        msg.remove();
-        console.log('[DEBUG] Success message removed from DOM');
-      }, 1500);
+        message.style.transform = 'translateX(100%)';
+        message.style.opacity = '0';
+        setTimeout(() => {
+          document.body.removeChild(message);
+        }, 300);
+      }, 2000);
     }
 
     function updateExerciseList() {
@@ -632,36 +851,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function clearForm() {
-      // Clear form fields with typewriter effect
-      const fields = [
-          document.querySelector('input[name="exercise"]'),
-          document.querySelector('input[name="set-weight"]'),
-          document.querySelector('input[name="set-reps"]'),
-          document.querySelector('input[name="set-time"]'),
-          document.getElementById('weightInput'),
-          document.getElementById('goalInput')
-      ];
+      // Clear form fields
+      if (dateInput) dateInput.value = '';
+      if (weightInput) weightInput.value = '';
+      if (goalInput) goalInput.value = '';
       
-      // Clear fields with staggered timing for a nice effect
-      fields.forEach((field, index) => {
-          if (field) {
-              setTimeout(() => {
-                  if (field.type === 'date') {
-                      // Set date back to today
-                      const today = new Date().toISOString().split('T')[0];
-                      field.value = today;
-                  } else {
-                      typewriterClear(field);
-                  }
-              }, index * 100); // 100ms delay between each field
-          }
-      });
+      // Clear exercises
+      exercises = [];
+      renderExerciseList();
       
-      log('Form cleared for new exercise');
+      // Reset date to today
+      const today = new Date().toISOString().split('T')[0];
+      if (dateInput) dateInput.value = today;
     }
 
-    loadJournal();
   } catch (error) {
-    console.error('[ERROR] Error initializing app:', error);
+    console.error('[ERROR] Failed to initialize app:', error);
   }
 }); 

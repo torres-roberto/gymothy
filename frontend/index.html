@@ -8,35 +8,56 @@
 </head>
 <body>
   <div class="container">
-    <h1>Gymothy</h1>
-    <form id="entryForm">
-      <label>Date: <input type="date" name="date" id="dateInput" required></label>
-      <label>Weight (lb): <input type="number" name="weight" id="weightInput" step="0.1" required></label>
-      <label>Goal (optional): <input type="text" name="goal" id="goalInput"></label>
-      <div id="exercises">
-        <div class="exercise-header">
-          <h3>Exercise</h3>
-          <button type="button" id="clearExercises" class="clear-btn" style="display: none;">New Exercise</button>
+    <header>
+      <h1>Gymothy</h1>
+      <div class="auth-section">
+        <div id="userInfo" style="display: none;">
+          <div class="user-profile">
+            <img src="/default-avatar.png" alt="Profile" class="user-avatar">
+            <span class="user-name">User Name</span>
+          </div>
         </div>
-        <div class="exercise-entry">
-          <input type="text" name="exercise" placeholder="Exercise name (required)" required>
-          <input type="number" name="set-weight" placeholder="Weight (lb)">
-          <input type="number" name="set-reps" placeholder="Reps">
-          <input type="text" name="set-time" placeholder="Time (e.g. 1:00)">
-          <button type="button" id="addExerciseToList">Add Exercise</button>
-        </div>
-        <ul id="exerciseList"></ul>
+        <button id="loginBtn" class="auth-btn login-btn">Sign in with Google</button>
+        <button id="logoutBtn" class="auth-btn logout-btn" style="display: none;">Sign Out</button>
       </div>
-      <button type="submit">Save Entry</button>
-    </form>
-    <section id="journal">
-      <h2>Journal Entries</h2>
-      <ul id="entriesList"></ul>
-    </section>
-    <section id="charts">
-      <h2>Progress Charts</h2>
-      <canvas id="progressChart"></canvas>
-    </section>
+    </header>
+
+    <main id="mainContent" style="display: none;">
+      <form id="entryForm">
+        <label>Date: <input type="date" name="date" id="dateInput" required></label>
+        <label>Weight (lb): <input type="number" name="weight" id="weightInput" step="0.1" required></label>
+        <label>Goal (optional): <input type="text" name="goal" id="goalInput"></label>
+        <div id="exercises">
+          <div class="exercise-header">
+            <h3>Exercise</h3>
+            <button type="button" id="clearExercises" class="clear-btn" style="display: none;">New Exercise</button>
+          </div>
+          <div class="exercise-entry">
+            <input type="text" name="exercise" placeholder="Exercise name (required)" required>
+            <input type="number" name="set-weight" placeholder="Weight (lb)">
+            <input type="number" name="set-reps" placeholder="Reps">
+            <input type="text" name="set-time" placeholder="Time (e.g. 1:00)">
+            <button type="button" id="addExerciseToList">Add Exercise</button>
+          </div>
+          <ul id="exerciseList"></ul>
+        </div>
+        <button type="submit">Save Entry</button>
+      </form>
+      <section id="journal">
+        <h2>Journal Entries</h2>
+        <ul id="entriesList"></ul>
+      </section>
+      <section id="charts">
+        <h2>Progress Charts</h2>
+        <canvas id="progressChart"></canvas>
+      </section>
+    </main>
+
+    <div id="loginPrompt" style="display: block; text-align: center; margin-top: 50px;">
+      <h2>Welcome to Gymothy</h2>
+      <p>Track your fitness journey with ease</p>
+      <button id="loginPromptBtn" class="auth-btn login-btn">Sign in with Google to Start</button>
+    </div>
   </div>
   <script src="/node_modules/chart.js/dist/chart.umd.js"></script>
   <script src="main.js"></script>
@@ -47,6 +68,14 @@
       if (dateInput) {
         const today = new Date().toISOString().split('T')[0];
         dateInput.value = today;
+      }
+
+      // Setup login prompt button
+      const loginPromptBtn = document.getElementById('loginPromptBtn');
+      if (loginPromptBtn) {
+        loginPromptBtn.addEventListener('click', () => {
+          window.location.href = window.location.origin + '/auth/google';
+        });
       }
     });
   </script>
