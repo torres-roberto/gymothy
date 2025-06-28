@@ -2,6 +2,16 @@ let exercises = [];
 let authToken = null;
 let currentUser = null;
 
+// Global error handler to catch any unhandled errors
+window.addEventListener('error', (event) => {
+  console.error('[GLOBAL ERROR]', event.error);
+  console.error('[GLOBAL ERROR] Stack:', event.error?.stack);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[GLOBAL PROMISE ERROR]', event.reason);
+});
+
 const isProduction = window.location.hostname.includes('onrender.com');
 const API_URL = isProduction
   ? 'https://gymothy-backend.onrender.com/api/entries'
@@ -67,7 +77,7 @@ const Auth = {
     this.clearToken();
     this.clearUser();
     this.updateUI();
-    window.location.href = window.location.origin;
+    window.location.reload();
   },
 
   updateUI() {
@@ -284,12 +294,18 @@ document.addEventListener('DOMContentLoaded', () => {
     loginBtn.addEventListener('click', () => {
       Auth.login();
     });
+    console.log('[DEBUG] Login button event listener attached');
+  } else {
+    console.log('[DEBUG] Login button not found');
   }
 
   if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
       Auth.logout();
     });
+    console.log('[DEBUG] Logout button event listener attached');
+  } else {
+    console.log('[DEBUG] Logout button not found');
   }
   
   try {
@@ -378,41 +394,54 @@ document.addEventListener('DOMContentLoaded', () => {
         renderExerciseList();
         // Keep all form fields populated for convenience
       });
+      console.log('[DEBUG] Add Exercise button event listener attached');
+    } else {
+      console.log('[DEBUG] Add Exercise button or exercise entry div not found');
     }
 
-    clearExercisesBtn.addEventListener('click', () => {
-      // Clear form fields with typewriter effect
-      const fields = [
-        exerciseEntryDiv.querySelector('input[name="exercise"]'),
-        exerciseEntryDiv.querySelector('input[name="set-weight"]'),
-        exerciseEntryDiv.querySelector('input[name="set-reps"]'),
-        exerciseEntryDiv.querySelector('input[name="set-time"]')
-      ];
-      
-      // Clear fields with staggered timing for a nice effect
-      fields.forEach((field, index) => {
-        setTimeout(() => {
-          if (field) {
-            typewriterClear(field, 30);
-          }
-        }, index * 100);
+    if (clearExercisesBtn) {
+      clearExercisesBtn.addEventListener('click', () => {
+        // Clear form fields with typewriter effect
+        const fields = [
+          exerciseEntryDiv.querySelector('input[name="exercise"]'),
+          exerciseEntryDiv.querySelector('input[name="set-weight"]'),
+          exerciseEntryDiv.querySelector('input[name="set-reps"]'),
+          exerciseEntryDiv.querySelector('input[name="set-time"]')
+        ];
+        
+        // Clear fields with staggered timing for a nice effect
+        fields.forEach((field, index) => {
+          setTimeout(() => {
+            if (field) {
+              typewriterClear(field, 30);
+            }
+          }, index * 100);
+        });
+        
+        // Clear exercises array
+        exercises = [];
+        renderExerciseList();
+        
+        // Show/hide clear button
+        if (clearExercisesBtn) {
+          clearExercisesBtn.style.display = 'none';
+        }
       });
-      
-      // Clear exercises array
-      exercises = [];
-      renderExerciseList();
-      
-      // Show/hide clear button
-      if (clearExercisesBtn) {
-        clearExercisesBtn.style.display = 'none';
-      }
-    });
+      console.log('[DEBUG] Clear Exercises button event listener attached');
+    } else {
+      console.log('[DEBUG] Clear Exercises button not found');
+    }
 
     // Form submission
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      saveEntry();
-    });
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        saveEntry();
+      });
+      console.log('[DEBUG] Form submit event listener attached');
+    } else {
+      console.log('[DEBUG] Form not found');
+    }
 
     // Initial setup
     renderExerciseList();
