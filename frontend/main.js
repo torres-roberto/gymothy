@@ -498,24 +498,20 @@ document.addEventListener('DOMContentLoaded', () => {
       backendEntries.forEach(entry => {
         backendMap.set(entry.date, entry);
       });
-      
       // Merge local entries with backend entries
       const merged = [...localEntries];
       backendEntries.forEach(backendEntry => {
         const localIndex = merged.findIndex(entry => entry.date === backendEntry.date);
         if (localIndex === -1) {
-          // Backend entry doesn't exist locally, add it
           merged.push(backendEntry);
         } else {
-          // Entry exists in both, keep the one with more recent ID (assuming ID is timestamp)
           if (backendEntry.id > merged[localIndex].id) {
             merged[localIndex] = backendEntry;
           }
         }
       });
-      
-      // Sort by date (newest first)
-      return merged.sort((a, b) => new Date(b.date) - new Date(a.date));
+      // Sort by date ascending
+      return merged.sort((a, b) => new Date(a.date) - new Date(b.date));
     }
 
     function displayEntries(entries) {
@@ -530,70 +526,74 @@ document.addEventListener('DOMContentLoaded', () => {
       
       entriesList.innerHTML = '';
       
-      entries.forEach(entry => {
+      // Sort entries by date ascending
+      const sortedEntries = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
+      sortedEntries.forEach(entry => {
         const li = document.createElement('li');
         li.className = 'journal-entry';
-        
+        // Expand/collapse logic
         const header = document.createElement('div');
         header.className = 'entry-header';
-        
+        header.style.cursor = 'pointer';
+        // Chevron icon
+        const chevron = document.createElement('span');
+        chevron.textContent = '▶';
+        chevron.style.marginRight = '0.5em';
+        header.appendChild(chevron);
         const date = document.createElement('strong');
         date.textContent = new Date(entry.date).toLocaleDateString();
         header.appendChild(date);
-        
         if (entry.bodyWeight) {
           const weight = document.createElement('span');
           weight.className = 'body-weight';
           weight.textContent = `${entry.bodyWeight} lb`;
           header.appendChild(weight);
         }
-        
         if (entry.goals) {
           const goals = document.createElement('span');
           goals.className = 'goals';
           goals.textContent = entry.goals;
           header.appendChild(goals);
         }
-        
         li.appendChild(header);
-        
+        // Details section (initially hidden)
+        const details = document.createElement('div');
+        details.className = 'entry-details';
+        details.style.display = 'none';
         if (entry.exercises && entry.exercises.length > 0) {
           const exercisesList = document.createElement('ul');
           exercisesList.className = 'exercises-list';
-          
           entry.exercises.forEach(exercise => {
             const exerciseLi = document.createElement('li');
             exerciseLi.className = 'exercise-entry';
-            
             const exerciseName = document.createElement('strong');
             exerciseName.textContent = exercise.name;
             exerciseLi.appendChild(exerciseName);
-            
             if (exercise.sets && exercise.sets.length > 0) {
               const setsList = document.createElement('ul');
               setsList.className = 'sets-list';
-              
               exercise.sets.forEach(set => {
                 const setLi = document.createElement('li');
                 const setDetails = [];
-                
                 if (set.weight) setDetails.push(`${set.weight} lb`);
                 if (set.reps) setDetails.push(`${set.reps} reps`);
                 if (set.time) setDetails.push(set.time);
-                
                 setLi.textContent = setDetails.join(' × ');
                 setsList.appendChild(setLi);
               });
-              
               exerciseLi.appendChild(setsList);
             }
-            
             exercisesList.appendChild(exerciseLi);
           });
-          
-          li.appendChild(exercisesList);
+          details.appendChild(exercisesList);
         }
-        
+        li.appendChild(details);
+        // Toggle details on header click
+        header.addEventListener('click', () => {
+          const isOpen = details.style.display === 'block';
+          details.style.display = isOpen ? 'none' : 'block';
+          chevron.textContent = isOpen ? '▶' : '▼';
+        });
         entriesList.appendChild(li);
       });
       
@@ -602,27 +602,23 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Update chart if Chart.js is available
       if (typeof Chart !== 'undefined') {
-        updateChart(entries);
+        updateChart(sortedEntries);
       }
     }
 
     function updateChart(entries) {
       const ctx = document.getElementById('progressChart');
       if (!ctx) return;
-      
-      // Filter entries with body weight data
-      const weightEntries = entries.filter(entry => entry.bodyWeight).slice(-30); // Last 30 entries
-      
+      // Filter entries with body weight data and sort by date ascending
+      const weightEntries = entries.filter(entry => entry.bodyWeight)
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .slice(-30); // Last 30 entries
       if (weightEntries.length === 0) return;
-      
       const labels = weightEntries.map(entry => new Date(entry.date).toLocaleDateString());
       const data = weightEntries.map(entry => parseFloat(entry.bodyWeight));
-      
-      // Destroy existing chart if it exists
       if (window.weightChart) {
         window.weightChart.destroy();
       }
-      
       window.weightChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -640,28 +636,16 @@ document.addEventListener('DOMContentLoaded', () => {
           scales: {
             y: {
               beginAtZero: false,
-              grid: {
-                color: '#333'
-              },
-              ticks: {
-                color: '#fff'
-              }
+              grid: { color: '#333' },
+              ticks: { color: '#fff' }
             },
             x: {
-              grid: {
-                color: '#333'
-              },
-              ticks: {
-                color: '#fff'
-              }
+              grid: { color: '#333' },
+              ticks: { color: '#fff' }
             }
           },
           plugins: {
-            legend: {
-              labels: {
-                color: '#fff'
-              }
-            }
+            legend: { labels: { color: '#fff' } }
           }
         }
       });
@@ -695,54 +679,43 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       
-      if (!bodyWeight) {
-        alert('Please enter your body weight.');
-        return;
-      }
-      
       if (exercises.length === 0) {
         alert('Please add at least one exercise.');
         return;
       }
       
-      const entry = {
-        date,
-        bodyWeight,
-        goals: goals || undefined,
-        exercises: [...exercises]
-      };
-      
-      console.log('[DEBUG] Entry to save:', entry);
+      // Merge with existing entry for the date if it exists
+      const localEntries = LocalStorage.getEntries();
+      let entry = localEntries.find(e => e.date === date);
+      if (entry) {
+        // Merge exercises
+        entry.exercises = [...entry.exercises, ...exercises];
+        if (bodyWeight) entry.bodyWeight = bodyWeight;
+        if (goals) entry.goals = goals;
+      } else {
+        entry = {
+          date,
+          bodyWeight: bodyWeight || undefined,
+          goals: goals || undefined,
+          exercises: [...exercises]
+        };
+        localEntries.push(entry);
+      }
       
       // Save to backend first
       API.post('/api/entries', entry)
         .then(response => response.json())
         .then(savedEntry => {
           console.log('[DEBUG] Entry saved to backend:', savedEntry);
-          
-          // Add to local storage
-          const localEntries = LocalStorage.getEntries();
-          const existingIndex = localEntries.findIndex(e => e.date === date);
-          
-          if (existingIndex !== -1) {
-            localEntries[existingIndex] = savedEntry;
-          } else {
-            localEntries.push(savedEntry);
-          }
-          
-          // Sort by date (newest first)
-          localEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
-          
+          // Update local entry with backend response (id, etc.)
+          const idx = localEntries.findIndex(e => e.date === date);
+          if (idx !== -1) localEntries[idx] = savedEntry;
+          // Sort by date ascending for display/merge
+          localEntries.sort((a, b) => new Date(a.date) - new Date(b.date));
           LocalStorage.saveEntries(localEntries);
           LocalStorage.setLastSync();
-          
-          // Display updated entries
           displayEntries(localEntries);
-          
-          // Clear form
           clearForm();
-          
-          // Show success message
           showSuccessMessage();
         })
         .catch(error => {
@@ -859,14 +832,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (dateInput) dateInput.value = '';
       if (weightInput) weightInput.value = '';
       if (goalInput) goalInput.value = '';
-      
       // Clear exercises
       exercises = [];
       renderExerciseList();
-      
-      // Reset date to today
-      const today = new Date().toISOString().split('T')[0];
-      if (dateInput) dateInput.value = today;
+      // Do not reset date to today (let user keep editing same date if desired)
     }
 
   } catch (error) {

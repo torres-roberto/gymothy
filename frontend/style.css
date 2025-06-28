@@ -381,4 +381,21 @@ button:hover {
   .auth-btn {
     width: 100% !important;
   }
+}
+
+.entry-header {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 1em;
+  margin-bottom: 0.5em;
+  cursor: pointer;
+}
+.entry-header strong {
+  flex: 1;
+}
+.entry-details {
+  margin-top: 0.5em;
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+  overflow: hidden;
 } 
