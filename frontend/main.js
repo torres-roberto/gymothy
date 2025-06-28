@@ -319,57 +319,59 @@ document.addEventListener('DOMContentLoaded', () => {
     if (journalSection) journalSection.style.display = 'none';
     if (chartsSection) chartsSection.style.display = 'none';
 
-    addExerciseToListBtn.addEventListener('click', () => {
-      console.log('[DEBUG] Add Exercise button clicked');
-      const name = exerciseEntryDiv.querySelector('input[name="exercise"]').value.trim();
-      const weight = exerciseEntryDiv.querySelector('input[name="set-weight"]').value;
-      const reps = exerciseEntryDiv.querySelector('input[name="set-reps"]').value;
-      const time = exerciseEntryDiv.querySelector('input[name="set-time"]').value;
-      
-      console.log('[DEBUG] Form values:', { name, weight, reps, time });
-      
-      if (!name) {
-        console.log('[DEBUG] No exercise name, showing alert');
-        alert('Exercise name is required.');
-        return;
-      }
-      
-      const newSet = {
-        weight: weight ? parseFloat(weight) : undefined,
-        reps: reps ? parseInt(reps) : undefined,
-        time: time || undefined
-      };
-      
-      console.log('[DEBUG] New set created:', newSet);
-      
-      // Check if exercise with same name and parameters already exists
-      const existingExerciseIndex = exercises.findIndex(ex => 
-        ex.name === name && 
-        ex.sets.length > 0 &&
-        ex.sets[0].weight === newSet.weight &&
-        ex.sets[0].reps === newSet.reps &&
-        ex.sets[0].time === newSet.time
-      );
-      
-      console.log('[DEBUG] Existing exercise index:', existingExerciseIndex);
-      
-      if (existingExerciseIndex !== -1) {
-        // Add to existing exercise as a new set
-        exercises[existingExerciseIndex].sets.push(newSet);
-        console.log('[DEBUG] Set added to existing exercise:', exercises[existingExerciseIndex]);
-      } else {
-        // Create new exercise
-        exercises.push({
-          name,
-          sets: [newSet]
-        });
-        console.log('[DEBUG] New exercise added to list:', exercises[exercises.length - 1]);
-      }
-      
-      console.log('[DEBUG] Current exercises array:', exercises);
-      renderExerciseList();
-      // Keep all form fields populated for convenience
-    });
+    if (addExerciseToListBtn && exerciseEntryDiv) {
+      addExerciseToListBtn.addEventListener('click', () => {
+        console.log('[DEBUG] Add Exercise button clicked');
+        const name = exerciseEntryDiv.querySelector('input[name="exercise"]').value.trim();
+        const weight = exerciseEntryDiv.querySelector('input[name="set-weight"]').value;
+        const reps = exerciseEntryDiv.querySelector('input[name="set-reps"]').value;
+        const time = exerciseEntryDiv.querySelector('input[name="set-time"]').value;
+        
+        console.log('[DEBUG] Form values:', { name, weight, reps, time });
+        
+        if (!name) {
+          console.log('[DEBUG] No exercise name, showing alert');
+          alert('Exercise name is required.');
+          return;
+        }
+        
+        const newSet = {
+          weight: weight ? parseFloat(weight) : undefined,
+          reps: reps ? parseInt(reps) : undefined,
+          time: time || undefined
+        };
+        
+        console.log('[DEBUG] New set created:', newSet);
+        
+        // Check if exercise with same name and parameters already exists
+        const existingExerciseIndex = exercises.findIndex(ex => 
+          ex.name === name && 
+          ex.sets.length > 0 &&
+          ex.sets[0].weight === newSet.weight &&
+          ex.sets[0].reps === newSet.reps &&
+          ex.sets[0].time === newSet.time
+        );
+        
+        console.log('[DEBUG] Existing exercise index:', existingExerciseIndex);
+        
+        if (existingExerciseIndex !== -1) {
+          // Add to existing exercise as a new set
+          exercises[existingExerciseIndex].sets.push(newSet);
+          console.log('[DEBUG] Set added to existing exercise:', exercises[existingExerciseIndex]);
+        } else {
+          // Create new exercise
+          exercises.push({
+            name,
+            sets: [newSet]
+          });
+          console.log('[DEBUG] New exercise added to list:', exercises[exercises.length - 1]);
+        }
+        
+        console.log('[DEBUG] Current exercises array:', exercises);
+        renderExerciseList();
+        // Keep all form fields populated for convenience
+      });
+    }
 
     clearExercisesBtn.addEventListener('click', () => {
       // Clear form fields with typewriter effect
