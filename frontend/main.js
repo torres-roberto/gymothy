@@ -74,6 +74,7 @@ const Auth = {
     const logoutBtn = document.getElementById('logoutBtn');
     const userInfo = document.getElementById('userInfo');
     const mainContent = document.getElementById('mainContent');
+    const loginCard = document.getElementById('loginCard');
 
     if (this.isAuthenticated()) {
       const user = this.getUser();
@@ -89,11 +90,13 @@ const Auth = {
         `;
       }
       if (mainContent) mainContent.style.display = 'block';
+      if (loginCard) loginCard.style.display = 'none';
     } else {
       if (loginBtn) loginBtn.style.display = 'block';
       if (logoutBtn) logoutBtn.style.display = 'none';
       if (userInfo) userInfo.style.display = 'none';
       if (mainContent) mainContent.style.display = 'none';
+      if (loginCard) loginCard.style.display = 'block';
     }
   }
 };
