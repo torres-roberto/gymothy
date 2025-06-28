@@ -2,11 +2,12 @@ let exercises = [];
 let authToken = null;
 let currentUser = null;
 
-const API_URL = process.env.NODE_ENV === 'production' 
+const isProduction = window.location.hostname.includes('onrender.com');
+const API_URL = isProduction
   ? 'https://gymothy-backend.onrender.com/api/entries'
   : 'http://localhost:3000/api/entries';
 
-const AUTH_URL = process.env.NODE_ENV === 'production'
+const AUTH_URL = isProduction
   ? 'https://gymothy-backend.onrender.com'
   : 'http://localhost:3000';
 
@@ -84,7 +85,7 @@ const Auth = {
         userInfo.style.display = 'block';
         userInfo.innerHTML = `
           <div class="user-profile">
-            <img src="${user.picture || '/default-avatar.png'}" alt="Profile" class="user-avatar">
+            <img src="${user.picture || 'https://ui-avatars.com/api/?name=User'}" alt="Profile" class="user-avatar">
             <span class="user-name">${user.name}</span>
           </div>
         `;
