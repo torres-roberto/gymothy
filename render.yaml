@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: gymothy-backend
+    env: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: USE_DB
+        value: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gymothy-db
+          property: connectionString
+
+databases:
+  - name: gymothy-db
+    databaseName: gymothy
+    user: gymothy
+    plan: free 
