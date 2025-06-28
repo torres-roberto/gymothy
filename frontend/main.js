@@ -847,6 +847,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // Do not reset date to today (let user keep editing same date if desired)
     }
 
+    window.loadJournal = loadJournal;
+
   } catch (error) {
     console.error('[ERROR] Failed to initialize app:', error);
   }
