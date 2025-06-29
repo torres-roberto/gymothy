@@ -332,9 +332,8 @@ function displayJournal(entries) {
     } else {
       // Merge exercises for the same date
       groupedByDate[entry.date].exercises.push(...entry.exercises);
-      // Prefer the latest non-empty bodyWeight and goals
+      // Prefer the latest non-empty bodyWeight
       if (entry.bodyWeight) groupedByDate[entry.date].bodyWeight = entry.bodyWeight;
-      if (entry.goals) groupedByDate[entry.date].goals = entry.goals;
     }
   });
   const groupedEntries = Object.values(groupedByDate).sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -343,7 +342,7 @@ function displayJournal(entries) {
     const li = document.createElement('li');
     li.className = 'journal-entry';
     const entryDate = new Date(entry.date).toLocaleDateString();
-    // Format exercises with grouped set display
+    // Format exercises with grouped set display, each on a separate line
     const exercises = entry.exercises.map(ex => {
       const groupedSets = groupSets(ex.sets);
       let setDisplay = groupedSets
@@ -354,14 +353,13 @@ function displayJournal(entries) {
         })
         .join(', ');
       return `${ex.name}: ${setDisplay}`;
-    }).join('; ');
+    }).join('<br>');
     li.innerHTML = `
       <div class="entry-header" onclick="toggleEntry(${index})">
         <div class="entry-title">
           <span class="expand-icon">▼</span>
           <strong>${entryDate}</strong>
           ${entry.bodyWeight ? `<span class="weight">${entry.bodyWeight}lb</span>` : ''}
-          ${entry.goals ? `<span class="goals">${entry.goals}</span>` : ''}
         </div>
       </div>
       <div class="entry-content" id="entry-content-${index}">
@@ -709,13 +707,11 @@ async function saveJournalEntry(e) {
   if (e) e.preventDefault();
   const dateInput = document.getElementById('dateInput');
   const weightInput = document.getElementById('weightInput');
-  const goalInput = document.getElementById('goalInput');
   if (!dateInput) return;
   
   const entry = {
     date: dateInput.value,
     bodyWeight: weightInput && weightInput.value ? weightInput.value : undefined,
-    goals: goalInput && goalInput.value ? goalInput.value : undefined,
     exercises: exercises.map(ex => ({
       name: ex.name,
       sets: ex.sets
@@ -734,7 +730,6 @@ async function saveJournalEntry(e) {
       const mergedEntry = {
         ...existingEntry,
         bodyWeight: entry.bodyWeight || existingEntry.bodyWeight,
-        goals: entry.goals || existingEntry.goals,
         exercises: [...existingEntry.exercises, ...entry.exercises]
       };
       
