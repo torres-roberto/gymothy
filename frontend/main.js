@@ -342,9 +342,20 @@ function displayJournal(entries) {
   const journalSection = document.getElementById('journal');
   if (!entriesList || !journalSection) return;
   
+  console.log('[DEBUG] displayJournal called with entries:', entries);
+  
+  // Filter out entries with no exercises or empty exercises
+  const validEntries = entries.filter(entry => 
+    entry.exercises && 
+    entry.exercises.length > 0 && 
+    entry.exercises.some(ex => ex.sets && ex.sets.length > 0)
+  );
+  
+  console.log('[DEBUG] Valid entries after filtering:', validEntries);
+  
   // Group entries by date
   const groupedByDate = {};
-  entries.forEach(entry => {
+  validEntries.forEach(entry => {
     if (!groupedByDate[entry.date]) {
       groupedByDate[entry.date] = {
         ...entry,
@@ -359,12 +370,16 @@ function displayJournal(entries) {
   });
   const groupedEntries = Object.values(groupedByDate).sort((a, b) => new Date(a.date) - new Date(b.date));
 
-  // Hide journal section if no entries
+  console.log('[DEBUG] Grouped entries:', groupedEntries);
+
+  // Hide journal section if no valid entries
   if (groupedEntries.length === 0) {
+    console.log('[DEBUG] No valid entries, hiding journal section');
     journalSection.style.display = 'none';
     return;
   }
   
+  console.log('[DEBUG] Showing journal section with', groupedEntries.length, 'entries');
   // Show journal section and clear list
   journalSection.style.display = 'block';
   entriesList.innerHTML = '';
@@ -427,16 +442,23 @@ function updateCharts(entries = []) {
   const chartsSection = document.getElementById('charts');
   if (!canvas || !chartsSection) return;
 
+  console.log('[DEBUG] updateCharts called with entries:', entries);
+
+  // Filter for entries with valid body weight data
   const sortedEntries = entries
-    .filter(entry => entry.bodyWeight)
+    .filter(entry => entry.bodyWeight && entry.bodyWeight.trim() !== '' && !isNaN(parseFloat(entry.bodyWeight)))
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 
-  // Hide charts section if no body weight data
+  console.log('[DEBUG] Valid body weight entries:', sortedEntries);
+
+  // Hide charts section if no valid body weight data
   if (sortedEntries.length === 0) {
+    console.log('[DEBUG] No valid body weight data, hiding charts section');
     chartsSection.style.display = 'none';
     return;
   }
   
+  console.log('[DEBUG] Showing charts section with', sortedEntries.length, 'entries');
   // Show charts section
   chartsSection.style.display = 'block';
 
