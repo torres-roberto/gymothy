@@ -35,6 +35,18 @@ function updateOAuthURL() {
     const oauthUrl = `${AUTH_URL}/auth/google`;
     googleSignInBtn.href = oauthUrl;
     console.log('[DEBUG] OAuth URL set to:', oauthUrl);
+    
+    // Add error handling for OAuth button clicks
+    googleSignInBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        console.log('[DEBUG] OAuth button clicked, redirecting to:', oauthUrl);
+        window.location.href = oauthUrl;
+      } catch (error) {
+        console.error('[DEBUG] OAuth redirect error:', error);
+        alert('Login service temporarily unavailable. Please try again later.');
+      }
+    });
   }
 }
 
@@ -430,7 +442,7 @@ function initializeApp() {
   }
 
   // Update UI
-  updateUI();
+  Auth.updateUI();
 
   // Attach event listeners
   attachEventListeners();
