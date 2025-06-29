@@ -67,6 +67,16 @@ function updateOAuthURL() {
         e.preventDefault();
         try {
           console.log('[DEBUG] OAuth button clicked, redirecting to:', oauthUrl);
+          
+          // First check if the OAuth endpoint is available
+          const checkResponse = await fetch(oauthUrl, { method: 'HEAD' });
+          console.log('[DEBUG] OAuth endpoint check status:', checkResponse.status);
+          
+          if (checkResponse.status === 503) {
+            alert('OAuth service is currently unavailable. Please try again later or contact support.');
+            return;
+          }
+          
           window.location.href = oauthUrl;
         } catch (error) {
           console.error('[DEBUG] OAuth redirect error:', error);
@@ -462,10 +472,38 @@ function initializeApp() {
   // Check for token in URL (OAuth callback)
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get('token');
-  if (token) {
-    Auth.setToken(token);
+  const error = urlParams.get('error');
+  
+  if (error) {
+    console.error('[DEBUG] OAuth error in URL:', error);
+    alert(`Login failed: ${error}. Please try again.`);
+    // Clear the error from URL
     window.history.replaceState({}, document.title, window.location.pathname);
-    console.log('[DEBUG] Token found in URL, stored');
+  } else if (token) {
+    console.log('[DEBUG] Token found in URL, length:', token.length);
+    try {
+      Auth.setToken(token);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      console.log('[DEBUG] Token stored successfully');
+      
+      // Try to decode and display user info for debugging
+      const tokenParts = token.split('.');
+      if (tokenParts.length === 3) {
+        try {
+          const payload = JSON.parse(atob(tokenParts[1]));
+          console.log('[DEBUG] Token payload:', payload);
+          if (payload.email && payload.name) {
+            Auth.setUser({ email: payload.email, name: payload.name });
+            console.log('[DEBUG] User info set from token');
+          }
+        } catch (e) {
+          console.log('[DEBUG] Could not decode token payload:', e);
+        }
+      }
+    } catch (e) {
+      console.error('[DEBUG] Error storing token:', e);
+      alert('Error processing login. Please try again.');
+    }
   }
 
   // Update UI
