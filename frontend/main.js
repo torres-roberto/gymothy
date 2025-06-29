@@ -281,9 +281,6 @@ window.clearAllEntries = function() {
     });
 };
 
-// Expose loadJournal globally so it is always available
-window.loadJournal = function() {};
-
 document.addEventListener('DOMContentLoaded', () => {
   console.log('[DEBUG] DOM loaded, initializing app...');
   
@@ -580,7 +577,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // After defining loadJournal, assign it to the global
+    // Expose the real loadJournal globally
     window.loadJournal = loadJournal;
 
     function mergeEntries(localEntries, backendEntries) {
