@@ -1,3 +1,5 @@
+console.log('[DEBUG] main.js loaded');
+
 let exercises = [];
 let authToken = null;
 let currentUser = null;
@@ -541,6 +543,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function loadJournal() {
+      console.log('[DEBUG] loadJournal called');
       if (!Auth.isAuthenticated()) {
         console.log('[DEBUG] Not authenticated, skipping journal load');
         return;
@@ -579,6 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Expose the real loadJournal globally
     window.loadJournal = loadJournal;
+    console.log('[DEBUG] window.loadJournal assigned');
 
     function mergeEntries(localEntries, backendEntries) {
       // Create a map of backend entries by date for quick lookup
