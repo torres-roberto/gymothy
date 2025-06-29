@@ -390,10 +390,50 @@ button:hover {
   gap: 1em;
   margin-bottom: 0.5em;
   cursor: pointer;
+  padding: 0.5em;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
 }
+
+.entry-header:hover {
+  background-color: #2a2f4a;
+}
+
+.entry-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  flex: 1;
+}
+
+.expand-icon {
+  font-size: 0.8em;
+  color: #eebbc3;
+  transition: transform 0.2s ease;
+  user-select: none;
+}
+
+.entry-header:hover .expand-icon {
+  transform: scale(1.1);
+}
+
+.entry-content {
+  padding: 0.5em;
+  border-top: 1px solid #2a2f4a;
+  margin-top: 0.5em;
+  transition: all 0.3s ease;
+}
+
+.entry-content .exercises {
+  color: #b8c1ec;
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+
 .entry-header strong {
   flex: 1;
 }
+
 .entry-details {
   margin-top: 0.5em;
   transition: max-height 0.3s ease, opacity 0.3s ease;
