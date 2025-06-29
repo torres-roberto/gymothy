@@ -302,7 +302,7 @@ async function loadJournal() {
     
     // Display entries
     displayJournal(entries);
-    updateCharts();
+    updateCharts(entries);
   } catch (error) {
     console.error('[ERROR] Failed to load journal:', error);
     // Try to load from local storage as fallback
@@ -310,7 +310,7 @@ async function loadJournal() {
     if (localEntries.length > 0) {
       console.log('[DEBUG] Loading from local storage as fallback');
       displayJournal(localEntries);
-      updateCharts();
+      updateCharts(localEntries);
     }
   }
 }
@@ -386,9 +386,9 @@ function toggleEntry(index) {
 }
 
 // Update progress charts
-function updateCharts() {
+function updateCharts(entries = []) {
   const canvas = document.getElementById('progressChart');
-  if (!canvas || journalEntries.length === 0) return;
+  if (!canvas || entries.length === 0) return;
 
   const ctx = canvas.getContext('2d');
   
@@ -397,7 +397,7 @@ function updateCharts() {
     window.progressChart.destroy();
   }
 
-  const sortedEntries = journalEntries
+  const sortedEntries = entries
     .filter(entry => entry.bodyWeight)
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 
