@@ -339,9 +339,9 @@ function formatTotalPounds(total) {
 // Display journal entries with expandable/collapsible functionality
 function displayJournal(entries) {
   const entriesList = document.getElementById('entriesList');
-  if (!entriesList) return;
-  entriesList.innerHTML = '';
-
+  const journalSection = document.getElementById('journal');
+  if (!entriesList || !journalSection) return;
+  
   // Group entries by date
   const groupedByDate = {};
   entries.forEach(entry => {
@@ -358,6 +358,16 @@ function displayJournal(entries) {
     }
   });
   const groupedEntries = Object.values(groupedByDate).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  // Hide journal section if no entries
+  if (groupedEntries.length === 0) {
+    journalSection.style.display = 'none';
+    return;
+  }
+  
+  // Show journal section and clear list
+  journalSection.style.display = 'block';
+  entriesList.innerHTML = '';
 
   groupedEntries.forEach((entry, index) => {
     const li = document.createElement('li');
@@ -414,7 +424,21 @@ function toggleEntry(index) {
 // Update progress charts
 function updateCharts(entries = []) {
   const canvas = document.getElementById('progressChart');
-  if (!canvas || entries.length === 0) return;
+  const chartsSection = document.getElementById('charts');
+  if (!canvas || !chartsSection) return;
+
+  const sortedEntries = entries
+    .filter(entry => entry.bodyWeight)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  // Hide charts section if no body weight data
+  if (sortedEntries.length === 0) {
+    chartsSection.style.display = 'none';
+    return;
+  }
+  
+  // Show charts section
+  chartsSection.style.display = 'block';
 
   const ctx = canvas.getContext('2d');
   
@@ -422,12 +446,6 @@ function updateCharts(entries = []) {
   if (window.progressChart) {
     window.progressChart.destroy();
   }
-
-  const sortedEntries = entries
-    .filter(entry => entry.bodyWeight)
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
-
-  if (sortedEntries.length === 0) return;
 
   const labels = sortedEntries.map(entry => new Date(entry.date).toLocaleDateString());
   const weights = sortedEntries.map(entry => parseFloat(entry.bodyWeight));
