@@ -330,18 +330,17 @@ function displayJournal(entries) {
     
     const entryDate = new Date(entry.date).toLocaleDateString();
     
-    // Format exercises with better set display
+    // Format exercises with grouped set display
     const exercises = entry.exercises.map(ex => {
-      const setCount = ex.sets.length;
-      if (setCount === 1) {
-        const set = ex.sets[0];
-        return `${ex.name}: ${set.weight || ''}lb × ${set.reps || ''}${set.time ? ` @ ${set.time}` : ''}`;
-      } else {
-        const setDisplay = ex.sets.map(set => 
-          `${set.weight || ''}lb × ${set.reps || ''}${set.time ? ` @ ${set.time}` : ''}`
-        ).join(', ');
-        return `${ex.name} x ${setCount}: ${setDisplay}`;
-      }
+      const groupedSets = groupSets(ex.sets);
+      let setDisplay = groupedSets
+        .map(set => {
+          let base = `${set.weight || ''}lb × ${set.reps || ''}${set.time ? ` @ ${set.time}` : ''}`;
+          if (set.count > 1) base += ` x ${set.count}`;
+          return base;
+        })
+        .join(', ');
+      return `${ex.name}: ${setDisplay}`;
     }).join('; ');
     
     li.innerHTML = `
@@ -646,28 +645,42 @@ window.loadJournal = loadJournal;
 window.Auth = Auth;
 window.toggleEntry = toggleEntry;
 
+function groupSets(sets) {
+  // Groups identical sets and returns an array of {weight, reps, time, count}
+  const grouped = [];
+  for (const set of sets) {
+    const last = grouped[grouped.length - 1];
+    if (
+      last &&
+      last.weight === set.weight &&
+      last.reps === set.reps &&
+      last.time === set.time
+    ) {
+      last.count++;
+    } else {
+      grouped.push({ ...set, count: 1 });
+    }
+  }
+  return grouped;
+}
+
 function renderExerciseList() {
   const exerciseList = document.getElementById('exerciseList');
   if (!exerciseList) return;
   exerciseList.innerHTML = '';
   exercises.forEach((exercise, idx) => {
     const li = document.createElement('li');
-    
-    // Format exercise display with set count
-    const setCount = exercise.sets.length;
-    let exerciseText;
-    if (setCount === 1) {
-      const set = exercise.sets[0];
-      exerciseText = `${exercise.name}: ${set.weight || ''}lb × ${set.reps || ''}${set.time ? ` @ ${set.time}` : ''}`;
-    } else {
-      const setDisplay = exercise.sets.map(set => 
-        `${set.weight || ''}lb × ${set.reps || ''}${set.time ? ` @ ${set.time}` : ''}`
-      ).join(', ');
-      exerciseText = `${exercise.name} x ${setCount}: ${setDisplay}`;
-    }
-    
+    // Group identical sets
+    const groupedSets = groupSets(exercise.sets);
+    let setDisplay = groupedSets
+      .map(set => {
+        let base = `${set.weight || ''}lb × ${set.reps || ''}${set.time ? ` @ ${set.time}` : ''}`;
+        if (set.count > 1) base += ` x ${set.count}`;
+        return base;
+      })
+      .join(', ');
+    let exerciseText = `${exercise.name}: ${setDisplay}`;
     li.innerHTML = `<span>${exerciseText}</span>`;
-    
     // Remove button
     const removeBtn = document.createElement('button');
     removeBtn.textContent = 'Remove';
