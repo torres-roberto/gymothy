@@ -283,6 +283,47 @@ window.clearAllEntries = function() {
     });
 };
 
+// --- Ensure loadJournal is defined at the top level and assigned to window ---
+function loadJournal() {
+  console.log('[DEBUG] loadJournal called');
+  if (!Auth.isAuthenticated()) {
+    console.log('[DEBUG] Not authenticated, skipping journal load');
+    return;
+  }
+
+  console.log('[DEBUG] Loading journal...');
+  
+  // Load from localStorage first
+  const localEntries = LocalStorage.getEntries();
+  displayEntries(localEntries);
+  
+  // Then sync with backend
+  API.get('/api/entries')
+    .then(response => response.json())
+    .then(backendEntries => {
+      console.log('[DEBUG] Backend entries loaded:', backendEntries.length);
+      
+      // Merge local and backend entries
+      const mergedEntries = mergeEntries(localEntries, backendEntries);
+      
+      // Save merged entries locally
+      LocalStorage.saveEntries(mergedEntries);
+      
+      // Display merged entries
+      displayEntries(mergedEntries);
+      
+      // Update last sync time
+      LocalStorage.setLastSync();
+    })
+    .catch(error => {
+      console.error('[ERROR] Failed to load from backend:', error);
+      // Still show local entries if backend fails
+      displayEntries(localEntries);
+    });
+}
+window.loadJournal = loadJournal;
+console.log('[DEBUG] window.loadJournal assigned at top level');
+
 document.addEventListener('DOMContentLoaded', () => {
   console.log('[DEBUG] DOM loaded, initializing app...');
   
@@ -541,48 +582,6 @@ document.addEventListener('DOMContentLoaded', () => {
         clearExercisesBtn.style.display = 'block';
       }
     }
-
-    function loadJournal() {
-      console.log('[DEBUG] loadJournal called');
-      if (!Auth.isAuthenticated()) {
-        console.log('[DEBUG] Not authenticated, skipping journal load');
-        return;
-      }
-
-      console.log('[DEBUG] Loading journal...');
-      
-      // Load from localStorage first
-      const localEntries = LocalStorage.getEntries();
-      displayEntries(localEntries);
-      
-      // Then sync with backend
-      API.get('/api/entries')
-        .then(response => response.json())
-        .then(backendEntries => {
-          console.log('[DEBUG] Backend entries loaded:', backendEntries.length);
-          
-          // Merge local and backend entries
-          const mergedEntries = mergeEntries(localEntries, backendEntries);
-          
-          // Save merged entries locally
-          LocalStorage.saveEntries(mergedEntries);
-          
-          // Display merged entries
-          displayEntries(mergedEntries);
-          
-          // Update last sync time
-          LocalStorage.setLastSync();
-        })
-        .catch(error => {
-          console.error('[ERROR] Failed to load from backend:', error);
-          // Still show local entries if backend fails
-          displayEntries(localEntries);
-        });
-    }
-
-    // Expose the real loadJournal globally
-    window.loadJournal = loadJournal;
-    console.log('[DEBUG] window.loadJournal assigned');
 
     function mergeEntries(localEntries, backendEntries) {
       // Create a map of backend entries by date for quick lookup
