@@ -587,4 +587,73 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Expose functions globally for debugging
 window.loadJournal = loadJournal;
-window.Auth = Auth; 
+window.Auth = Auth;
+
+function renderExerciseList() {
+  const exerciseList = document.getElementById('exerciseList');
+  if (!exerciseList) return;
+  exerciseList.innerHTML = '';
+  exercises.forEach((exercise, idx) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span><strong>${exercise.name}</strong>: ${exercise.sets.map(set => `${set.weight ?? ''}lb × ${set.reps ?? ''}${set.time ? ` @ ${set.time}` : ''}`).join(', ')}</span>`;
+    // Remove button
+    const removeBtn = document.createElement('button');
+    removeBtn.textContent = 'Remove';
+    removeBtn.className = 'removeExerciseFromList';
+    removeBtn.onclick = () => {
+      exercises.splice(idx, 1);
+      renderExerciseList();
+    };
+    li.appendChild(removeBtn);
+    exerciseList.appendChild(li);
+  });
+}
+
+async function saveJournalEntry(e) {
+  if (e) e.preventDefault();
+  const dateInput = document.getElementById('dateInput');
+  const weightInput = document.getElementById('weightInput');
+  const goalInput = document.getElementById('goalInput');
+  if (!dateInput) return;
+  const entry = {
+    date: dateInput.value,
+    bodyWeight: weightInput && weightInput.value ? weightInput.value : undefined,
+    goals: goalInput && goalInput.value ? goalInput.value : undefined,
+    exercises: exercises.map(ex => ({
+      name: ex.name,
+      sets: ex.sets
+    }))
+  };
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Auth.getToken()}`
+      },
+      body: JSON.stringify(entry)
+    });
+    if (response.ok) {
+      exercises = [];
+      renderExerciseList();
+      loadJournal();
+      if (weightInput && weightInput.value) {
+        localStorage.setItem(STORAGE_KEYS.LAST_WEIGHT, weightInput.value);
+      }
+      // Show success message
+      const msg = document.createElement('div');
+      msg.className = 'success-message';
+      msg.textContent = 'Journal entry saved!';
+      document.body.appendChild(msg);
+      setTimeout(() => msg.remove(), 2000);
+    } else {
+      alert('Failed to save entry.');
+    }
+  } catch (err) {
+    alert('Error saving entry.');
+    console.error(err);
+  }
+}
+
+window.renderExerciseList = renderExerciseList;
+window.saveJournalEntry = saveJournalEntry; 
