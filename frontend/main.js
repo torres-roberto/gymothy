@@ -12,14 +12,40 @@ window.addEventListener('unhandledrejection', (event) => {
   console.error('[GLOBAL PROMISE ERROR]', event.reason);
 });
 
-const isProduction = window.location.hostname.includes('onrender.com');
-const API_URL = isProduction
-  ? 'https://gymothy-backend.onrender.com/api/entries'
-  : 'http://localhost:3000/api/entries';
+function updateDebugBanner(extra) {
+  const banner = document.getElementById('debugBanner');
+  if (!banner) return;
+  const token = Auth.getToken();
+  const isAuth = !!token;
+  let addExerciseStatus = window._addExerciseListenerAttached ? 'attached' : 'not attached';
+  banner.innerText =
+    `[DEBUG] Authenticated: ${isAuth} | Token: ${token ? token.slice(0, 12) + '...' : 'none'} | Add Exercise: ${addExerciseStatus}` + (extra ? ` | ${extra}` : '');
+  banner.style.display = 'block';
+}
 
-const AUTH_URL = isProduction
-  ? 'https://gymothy-backend.onrender.com'
-  : 'http://localhost:3000';
+// Enhanced localhost detection with debugging
+const hostname = window.location.hostname;
+const port = window.location.port;
+console.log('[DEBUG] Hostname:', hostname, 'Port:', port, 'Full URL:', window.location.href);
+
+const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+console.log('[DEBUG] Is localhost:', isLocalhost);
+
+// Set API URLs based on environment
+const API_URL = isLocalhost ? 'http://localhost:3000/api/entries' : 'https://gymothy-backend.onrender.com/api/entries';
+const AUTH_URL = isLocalhost ? 'http://localhost:3000' : 'https://gymothy-backend.onrender.com';
+console.log('[DEBUG] API_URL:', API_URL);
+console.log('[DEBUG] AUTH_URL:', AUTH_URL);
+
+// Update OAuth URL dynamically
+function updateOAuthURL() {
+  const googleSignInBtn = document.getElementById('googleSignInBtn');
+  if (googleSignInBtn) {
+    const oauthURL = isLocalhost ? 'http://localhost:3000/auth/google' : 'https://gymothy-backend.onrender.com/auth/google';
+    googleSignInBtn.href = oauthURL;
+    console.log('[DEBUG] OAuth URL set to:', oauthURL);
+  }
+}
 
 // Logging helper
 function log(...args) {
@@ -112,6 +138,7 @@ const Auth = {
       if (loginCard) loginCard.style.display = 'block';
       console.log('[DEBUG] Not authenticated. Showing login card.');
     }
+    updateDebugBanner();
   }
 };
 
@@ -260,6 +287,16 @@ window.loadJournal = function() {};
 document.addEventListener('DOMContentLoaded', () => {
   console.log('[DEBUG] DOM loaded, initializing app...');
   
+  // Update OAuth URL based on environment
+  updateOAuthURL();
+  
+  // Set date input to today by default
+  const dateInput = document.getElementById('dateInput');
+  if (dateInput) {
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.value = today;
+  }
+
   // Check for authentication token in URL (from OAuth callback)
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get('token');
@@ -341,13 +378,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (journalSection) journalSection.style.display = 'none';
     if (chartsSection) chartsSection.style.display = 'none';
 
-    // Set date input to today by default if empty
-    const dateInput = document.getElementById('dateInput');
-    if (dateInput && !dateInput.value) {
-      const today = new Date().toISOString().split('T')[0];
-      dateInput.value = today;
-    }
-
     // Load last weight from localStorage if present
     const weightInput = document.getElementById('weightInput');
     if (weightInput && !weightInput.value) {
@@ -362,6 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('[DEBUG] Attaching Add Exercise event listener');
       addExerciseToListBtn.addEventListener('click', () => {
         console.log('[DEBUG] Add Exercise button clicked');
+        updateDebugBanner('Add Exercise clicked');
         const name = exerciseEntryDiv.querySelector('input[name="exercise"]').value.trim();
         const weight = exerciseEntryDiv.querySelector('input[name="set-weight"]').value;
         const reps = exerciseEntryDiv.querySelector('input[name="set-reps"]').value;
@@ -409,8 +440,12 @@ document.addEventListener('DOMContentLoaded', () => {
         renderExerciseList();
         // Keep all form fields populated for convenience
       });
+      window._addExerciseListenerAttached = true;
+      updateDebugBanner();
       console.log('[DEBUG] Add Exercise button event listener attached');
     } else {
+      window._addExerciseListenerAttached = false;
+      updateDebugBanner('Add Exercise button missing');
       console.log('[DEBUG] Add Exercise button or exercise entry div not found');
     }
 

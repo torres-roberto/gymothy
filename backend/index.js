@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const passport = require('passport');
@@ -82,33 +84,39 @@ function authenticateToken(req, res, next) {
 }
 
 // Google OAuth Strategy
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:3000/auth/google/callback"
-}, async (accessToken, refreshToken, profile, done) => {
-  try {
-    const user = {
-      email: profile.emails[0].value,
-      name: profile.displayName,
-      picture: profile.photos[0]?.value
-    };
+const hasGoogleCredentials = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET;
 
-    if (USE_DB) {
-      await ensureTables();
-      await pool.query(
-        'INSERT INTO users (email, name, picture) VALUES ($1, $2, $3) ON CONFLICT (email) DO UPDATE SET name = $2, picture = $3',
-        [user.email, user.name, user.picture]
-      );
-    } else {
-      users.set(user.email, user);
+if (hasGoogleCredentials) {
+  passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:3000/auth/google/callback"
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      const user = {
+        email: profile.emails[0].value,
+        name: profile.displayName,
+        picture: profile.photos[0]?.value
+      };
+
+      if (USE_DB) {
+        await ensureTables();
+        await pool.query(
+          'INSERT INTO users (email, name, picture) VALUES ($1, $2, $3) ON CONFLICT (email) DO UPDATE SET name = $2, picture = $3',
+          [user.email, user.name, user.picture]
+        );
+      } else {
+        users.set(user.email, user);
+      }
+
+      return done(null, user);
+    } catch (error) {
+      return done(error, null);
     }
-
-    return done(null, user);
-  } catch (error) {
-    return done(error, null);
-  }
-}));
+  }));
+} else {
+  console.log('Google OAuth credentials not provided - OAuth routes will be disabled');
+}
 
 passport.serializeUser((user, done) => {
   done(null, user.email);
@@ -128,15 +136,31 @@ passport.deserializeUser(async (email, done) => {
 });
 
 // Auth routes
-app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+if (hasGoogleCredentials) {
+  app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
-app.get('/auth/google/callback', 
-  passport.authenticate('google', { failureRedirect: '/login' }),
-  (req, res) => {
-    const token = jwt.sign({ email: req.user.email, name: req.user.name }, JWT_SECRET, { expiresIn: '7d' });
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:8000'}?token=${token}`);
-  }
-);
+  app.get('/auth/google/callback', 
+    passport.authenticate('google', { failureRedirect: '/login' }),
+    (req, res) => {
+      const token = jwt.sign({ email: req.user.email, name: req.user.name }, JWT_SECRET, { expiresIn: '7d' });
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8000';
+      const redirectUrl = `${frontendUrl}?token=${token}`;
+      console.log('[DEBUG] OAuth callback - FRONTEND_URL:', process.env.FRONTEND_URL);
+      console.log('[DEBUG] OAuth callback - frontendUrl:', frontendUrl);
+      console.log('[DEBUG] OAuth callback - redirectUrl:', redirectUrl);
+      res.redirect(redirectUrl);
+    }
+  );
+} else {
+  // Mock OAuth routes for testing
+  app.get('/auth/google', (req, res) => {
+    res.status(503).json({ error: 'OAuth not configured for testing' });
+  });
+  
+  app.get('/auth/google/callback', (req, res) => {
+    res.status(503).json({ error: 'OAuth not configured for testing' });
+  });
+}
 
 app.get('/auth/logout', (req, res) => {
   req.logout();
