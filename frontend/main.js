@@ -121,11 +121,11 @@ const Auth = {
     const userAvatarElem = document.getElementById('userAvatar');
 
     if (isAuthenticated && user) {
-      userNameElem.textContent = user.name || 'User';
-      userAvatarElem.src = user.picture || 'https://ui-avatars.com/api/?name=User';
+      if (userNameElem) userNameElem.textContent = user.name || 'User';
+      if (userAvatarElem) userAvatarElem.src = user.picture || 'https://ui-avatars.com/api/?name=User';
     } else {
-      userNameElem.textContent = '';
-      userAvatarElem.src = '';
+      if (userNameElem) userNameElem.textContent = '';
+      if (userAvatarElem) userAvatarElem.src = '';
     }
 
     const logoutBtn = document.getElementById('logoutBtn');
