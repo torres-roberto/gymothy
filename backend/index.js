@@ -74,6 +74,15 @@ function authenticateToken(req, res, next) {
     return res.status(401).json({ error: 'Access token required' });
   }
 
+  // Handle mock tokens for local development
+  if (token.startsWith('mock-dev-token-')) {
+    req.user = {
+      email: 'dev@example.com',
+      name: 'Development User'
+    };
+    return next();
+  }
+
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
       return res.status(403).json({ error: 'Invalid token' });
