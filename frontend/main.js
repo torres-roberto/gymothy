@@ -315,6 +315,27 @@ async function loadJournal() {
   }
 }
 
+// Calculate total pounds pushed for an entry
+function calculateTotalPounds(entry) {
+  let total = 0;
+  entry.exercises.forEach(exercise => {
+    exercise.sets.forEach(set => {
+      if (set.weight && set.reps) {
+        total += set.weight * set.reps * (set.count || 1);
+      }
+    });
+  });
+  return total;
+}
+
+// Format total pounds with k notation for values over 1000
+function formatTotalPounds(total) {
+  if (total >= 1000) {
+    return (total / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  }
+  return total.toString();
+}
+
 // Display journal entries with expandable/collapsible functionality
 function displayJournal(entries) {
   const entriesList = document.getElementById('entriesList');
@@ -342,6 +363,11 @@ function displayJournal(entries) {
     const li = document.createElement('li');
     li.className = 'journal-entry';
     const entryDate = new Date(entry.date).toLocaleDateString();
+    
+    // Calculate total pounds pushed
+    const totalPounds = calculateTotalPounds(entry);
+    const formattedTotal = formatTotalPounds(totalPounds);
+    
     // Format exercises with grouped set display, each on a separate line
     const exercises = entry.exercises.map(ex => {
       const groupedSets = groupSets(ex.sets);
@@ -359,7 +385,7 @@ function displayJournal(entries) {
         <div class="entry-title">
           <span class="expand-icon">▼</span>
           <strong>${entryDate}</strong>
-          ${entry.bodyWeight ? `<span class="weight">${entry.bodyWeight}lb</span>` : ''}
+          ${totalPounds > 0 ? `<span class="weight">${formattedTotal} lbs</span>` : ''}
         </div>
       </div>
       <div class="entry-content" id="entry-content-${index}">

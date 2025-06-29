@@ -384,6 +384,26 @@ button:hover {
   .auth-btn {
     width: 100% !important;
   }
+
+  /* Fix date field layout on mobile */
+  form label {
+    display: block;
+    margin-bottom: 0.5em;
+    text-align: left;
+  }
+
+  input[type="date"] {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Ensure form inputs don't overflow */
+  input[type="text"], input[type="number"], input[type="date"] {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
 }
 
 .entry-header {
