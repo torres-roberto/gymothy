@@ -4,6 +4,8 @@ let exercises = [];
 let authToken = null;
 let currentUser = null;
 
+const VERSION = 'v0.6.0';
+
 // Global error handler to catch any unhandled errors
 window.addEventListener('error', (event) => {
   console.error('[GLOBAL ERROR]', event.error);
@@ -344,14 +346,43 @@ function displayJournal(entries) {
   
   console.log('[DEBUG] displayJournal called with entries:', entries);
   
-  // Filter out entries with no exercises or empty exercises
-  const validEntries = entries.filter(entry => 
-    entry.exercises && 
-    entry.exercises.length > 0 && 
-    entry.exercises.some(ex => ex.sets && ex.sets.length > 0)
-  );
+  // More strict filtering - only include entries with valid exercises that have actual set data
+  const validEntries = entries.filter(entry => {
+    if (!entry.exercises || entry.exercises.length === 0) {
+      console.log('[DEBUG] Entry filtered out - no exercises:', entry);
+      return false;
+    }
+    
+    // Check if any exercise has valid sets with actual data
+    const hasValidSets = entry.exercises.some(ex => {
+      if (!ex.sets || ex.sets.length === 0) {
+        console.log('[DEBUG] Exercise filtered out - no sets:', ex);
+        return false;
+      }
+      
+      // Check if sets have actual weight or reps data
+      const hasValidSetData = ex.sets.some(set => {
+        const hasWeight = set.weight && set.weight > 0;
+        const hasReps = set.reps && set.reps > 0;
+        const hasTime = set.time && set.time.trim() !== '';
+        return hasWeight || hasReps || hasTime;
+      });
+      
+      if (!hasValidSetData) {
+        console.log('[DEBUG] Exercise filtered out - no valid set data:', ex);
+      }
+      
+      return hasValidSetData;
+    });
+    
+    if (!hasValidSets) {
+      console.log('[DEBUG] Entry filtered out - no valid sets in any exercise:', entry);
+    }
+    
+    return hasValidSets;
+  });
   
-  console.log('[DEBUG] Valid entries after filtering:', validEntries);
+  console.log('[DEBUG] Valid entries after strict filtering:', validEntries);
   
   // Group entries by date
   const groupedByDate = {};
@@ -444,12 +475,32 @@ function updateCharts(entries = []) {
 
   console.log('[DEBUG] updateCharts called with entries:', entries);
 
-  // Filter for entries with valid body weight data
+  // More strict filtering for entries with valid body weight data
   const sortedEntries = entries
-    .filter(entry => entry.bodyWeight && entry.bodyWeight.trim() !== '' && !isNaN(parseFloat(entry.bodyWeight)))
+    .filter(entry => {
+      if (!entry.bodyWeight) {
+        console.log('[DEBUG] Entry filtered out - no bodyWeight:', entry);
+        return false;
+      }
+      
+      const weightStr = entry.bodyWeight.toString().trim();
+      if (weightStr === '') {
+        console.log('[DEBUG] Entry filtered out - empty bodyWeight:', entry);
+        return false;
+      }
+      
+      const weightNum = parseFloat(weightStr);
+      if (isNaN(weightNum) || weightNum <= 0) {
+        console.log('[DEBUG] Entry filtered out - invalid bodyWeight:', entry.bodyWeight, 'parsed as:', weightNum);
+        return false;
+      }
+      
+      console.log('[DEBUG] Entry has valid bodyWeight:', weightNum);
+      return true;
+    })
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 
-  console.log('[DEBUG] Valid body weight entries:', sortedEntries);
+  console.log('[DEBUG] Valid body weight entries after strict filtering:', sortedEntries);
 
   // Hide charts section if no valid body weight data
   if (sortedEntries.length === 0) {
