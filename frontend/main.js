@@ -32,58 +32,13 @@ console.log('[DEBUG] AUTH_URL:', AUTH_URL);
 function updateOAuthURL() {
   const googleSignInBtn = document.getElementById('googleSignInBtn');
   if (googleSignInBtn) {
-    if (isLocalhost) {
-      // For local development, create a mock login button
-      googleSignInBtn.textContent = 'Mock Login (Dev)';
-      googleSignInBtn.href = '#';
-      googleSignInBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        console.log('[DEBUG] Mock login clicked');
-        
-        // Create a mock user and token for local development
-        const mockUser = {
-          email: 'dev@example.com',
-          name: 'Development User',
-          picture: 'https://ui-avatars.com/api/?name=Dev+User'
-        };
-        
-        // Simple mock token for local development
-        const mockToken = 'mock-dev-token-' + Date.now();
-        
-        Auth.setToken(mockToken);
-        Auth.setUser(mockUser);
-        Auth.updateUI();
-        
-        console.log('[DEBUG] Mock login successful');
-      });
-    } else {
-      // Production OAuth
-      const oauthUrl = `${AUTH_URL}/auth/google`;
-      googleSignInBtn.href = oauthUrl;
-      console.log('[DEBUG] OAuth URL set to:', oauthUrl);
-      
-      // Add error handling for OAuth button clicks
-      googleSignInBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        try {
-          console.log('[DEBUG] OAuth button clicked, redirecting to:', oauthUrl);
-          
-          // First check if the OAuth endpoint is available
-          const checkResponse = await fetch(oauthUrl, { method: 'HEAD' });
-          console.log('[DEBUG] OAuth endpoint check status:', checkResponse.status);
-          
-          if (checkResponse.status === 503) {
-            alert('OAuth service is currently unavailable. Please try again later or contact support.');
-            return;
-          }
-          
-          window.location.href = oauthUrl;
-        } catch (error) {
-          console.error('[DEBUG] OAuth redirect error:', error);
-          alert('Login service temporarily unavailable. Please try again later.');
-        }
-      });
-    }
+    const oauthUrl = `${AUTH_URL}/auth/google`;
+    googleSignInBtn.href = oauthUrl;
+    googleSignInBtn.onclick = (e) => {
+      e.preventDefault();
+      console.log('[DEBUG] OAuth button clicked, redirecting to:', oauthUrl);
+      window.location.href = oauthUrl;
+    };
   }
 }
 
@@ -157,6 +112,22 @@ const Auth = {
   },
 
   updateUI() {
+    const isAuthenticated = Auth.isAuthenticated();
+    const user = Auth.getUser();
+    console.log('[DEBUG] updateUI called. Authenticated:', isAuthenticated, 'User:', user);
+
+    // User info elements
+    const userNameElem = document.getElementById('userName');
+    const userAvatarElem = document.getElementById('userAvatar');
+
+    if (isAuthenticated && user) {
+      userNameElem.textContent = user.name || 'User';
+      userAvatarElem.src = user.picture || 'https://ui-avatars.com/api/?name=User';
+    } else {
+      userNameElem.textContent = '';
+      userAvatarElem.src = '';
+    }
+
     const logoutBtn = document.getElementById('logoutBtn');
     const userInfo = document.getElementById('userInfo');
     const mainContent = document.getElementById('mainContent');
@@ -166,7 +137,6 @@ const Auth = {
     console.log('[DEBUG] updateUI called. Authenticated:', !!token, 'Token:', token ? token.slice(0, 12) + '...' : 'none');
 
     if (this.isAuthenticated()) {
-      const user = this.getUser();
       if (logoutBtn) logoutBtn.style.display = 'block';
       if (userInfo) {
         userInfo.style.display = 'block';
