@@ -319,17 +319,30 @@ async function loadJournal() {
 function displayJournal(entries) {
   const entriesList = document.getElementById('entriesList');
   if (!entriesList) return;
-
   entriesList.innerHTML = '';
-  
-  const sortedEntries = entries.sort((a, b) => new Date(a.date) - new Date(b.date));
-  
-  sortedEntries.forEach((entry, index) => {
+
+  // Group entries by date
+  const groupedByDate = {};
+  entries.forEach(entry => {
+    if (!groupedByDate[entry.date]) {
+      groupedByDate[entry.date] = {
+        ...entry,
+        exercises: [...entry.exercises]
+      };
+    } else {
+      // Merge exercises for the same date
+      groupedByDate[entry.date].exercises.push(...entry.exercises);
+      // Prefer the latest non-empty bodyWeight and goals
+      if (entry.bodyWeight) groupedByDate[entry.date].bodyWeight = entry.bodyWeight;
+      if (entry.goals) groupedByDate[entry.date].goals = entry.goals;
+    }
+  });
+  const groupedEntries = Object.values(groupedByDate).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  groupedEntries.forEach((entry, index) => {
     const li = document.createElement('li');
     li.className = 'journal-entry';
-    
     const entryDate = new Date(entry.date).toLocaleDateString();
-    
     // Format exercises with grouped set display
     const exercises = entry.exercises.map(ex => {
       const groupedSets = groupSets(ex.sets);
@@ -342,7 +355,6 @@ function displayJournal(entries) {
         .join(', ');
       return `${ex.name}: ${setDisplay}`;
     }).join('; ');
-    
     li.innerHTML = `
       <div class="entry-header" onclick="toggleEntry(${index})">
         <div class="entry-title">
@@ -356,7 +368,6 @@ function displayJournal(entries) {
         <div class="exercises">${exercises}</div>
       </div>
     `;
-    
     entriesList.appendChild(li);
   });
 }
