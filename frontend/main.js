@@ -14,17 +14,6 @@ window.addEventListener('unhandledrejection', (event) => {
   console.error('[GLOBAL PROMISE ERROR]', event.reason);
 });
 
-function updateDebugBanner(extra) {
-  const banner = document.getElementById('debugBanner');
-  if (!banner) return;
-  const token = Auth.getToken();
-  const isAuth = !!token;
-  let addExerciseStatus = window._addExerciseListenerAttached ? 'attached' : 'not attached';
-  banner.innerText =
-    `[DEBUG] Authenticated: ${isAuth} | Token: ${token ? token.slice(0, 12) + '...' : 'none'} | Add Exercise: ${addExerciseStatus}` + (extra ? ` | ${extra}` : '');
-  banner.style.display = 'block';
-}
-
 // Enhanced localhost detection with debugging
 const hostname = window.location.hostname;
 const port = window.location.port;
@@ -140,7 +129,6 @@ const Auth = {
       if (loginCard) loginCard.style.display = 'block';
       console.log('[DEBUG] Not authenticated. Showing login card.');
     }
-    updateDebugBanner();
   }
 };
 
@@ -432,7 +420,6 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('[DEBUG] Attaching Add Exercise event listener');
       addExerciseToListBtn.addEventListener('click', () => {
         console.log('[DEBUG] Add Exercise button clicked');
-        updateDebugBanner('Add Exercise clicked');
         const name = exerciseEntryDiv.querySelector('input[name="exercise"]').value.trim();
         const weight = exerciseEntryDiv.querySelector('input[name="set-weight"]').value;
         const reps = exerciseEntryDiv.querySelector('input[name="set-reps"]').value;
@@ -481,11 +468,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Keep all form fields populated for convenience
       });
       window._addExerciseListenerAttached = true;
-      updateDebugBanner();
       console.log('[DEBUG] Add Exercise button event listener attached');
     } else {
       window._addExerciseListenerAttached = false;
-      updateDebugBanner('Add Exercise button missing');
       console.log('[DEBUG] Add Exercise button or exercise entry div not found');
     }
 
